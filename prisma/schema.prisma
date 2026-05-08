@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Cliente {
+  id        String   @id @default(cuid())
+  nome      String
+  cpf       String   @unique
+  cnpj      String?
+  empresa   String?
+  email     String?
+  telefone  String
+  whatsapp  String?
+  createdAt DateTime @default(now())
+  pedidos   Pedido[]
+}
+
+model Pedido {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  tipo      String   // "consulta" | "servico"
+  status    String   @default("aguardando_pagamento")
+  valorTotal Float
+  valorPago  Float   @default(0)
+  formaPagamento String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Modalidade escolhida pelo cliente
+  modalidade    String?  // avista_pix | parcelado_cartao | boleto_parcelado | entrada_50_50 | 6x_cartao
+  parcelas      Int?     // número de parcelas (cartão)
+  valorEntrada  Float?   // valor da entrada a ser cobrado agora (50/50 ou boleto parcelado)
+  faixaCredito  String?  // para Rating: "ate_100k" | "100k_300k" | "acima_300k"
+
+  // PIX Cora
+  pixCobrancaId String?  // invoice id retornado pela Cora
+  pixEmv        String?  // código Pix Copia e Cola (EMV)
+  pixQrUrl      String?  // URL da imagem PNG do QR Code
+
+  // Boleto Cora
+  boletoCobrancaId String?
+  boletoUrl        String?
+
+  // Cartão Cora
+  cartaoCobrancaId  String?
+  cartaoCheckoutUrl String?
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  itens     ItemPedido[]
+  contrato  Contrato?
+}
+
+model ItemPedido {
+  id       String @id @default(cuid())
+  nome     String
+  valor    Float
+
+  pedidoId String
+  pedido   Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+model Contrato {
+  id              String    @id @default(cuid())
+  signingToken    String?   @unique  // token único para URL de assinatura
+
+  // Documento gerado (antes da assinatura)
+  documentoPath   String?           // caminho no servidor
+  documentoHash   String?           // SHA-256 do conteúdo original
+
+  // Dados de assinatura
+  status          String    @default("pendente") // pendente | assinado | cancelado
+  assinadoEm      DateTime?
+  assinaturaPath  String?           // caminho do PDF assinado
+  assinaturaHash  String?           // SHA-256 do PDF assinado
+  nomeAssinante   String?           // nome confirmado pelo signatário
+  signingIp       String?
+  signingUserAgent String?
+
+  createdAt       DateTime  @default(now())
+
+  pedidoId String @unique
+  pedido   Pedido @relation(fields: [pedidoId], references: [id])
+}
