@@ -15,15 +15,14 @@ const SERVICO_META: Record<string, { tipo: TipoServico; prazo: string }> = {
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
-    nome, cpf, cnpj, empresa, telefone, whatsapp, email,
+    nome, cpf, cnpj, empresa, whatsapp, email,
     servico, valor, entrada, modalidade, parcelas, faixaCredito,
   } = body as {
     nome: string;
     cpf: string;
     cnpj?: string;
     empresa?: string;
-    telefone: string;
-    whatsapp?: string;
+    whatsapp: string;
     email?: string;
     servico: string;
     valor: number;
@@ -33,7 +32,7 @@ export async function POST(req: NextRequest) {
     faixaCredito?: string;
   };
 
-  if (!nome || !cpf || !telefone || !servico || !valor) {
+  if (!nome || !cpf || !whatsapp || !servico || !valor) {
     return NextResponse.json({ error: "Dados obrigatórios faltando" }, { status: 400 });
   }
 
@@ -48,12 +47,12 @@ export async function POST(req: NextRequest) {
   let cliente = await prisma.cliente.findUnique({ where: { cpf } });
   if (!cliente) {
     cliente = await prisma.cliente.create({
-      data: { nome, cpf, cnpj, empresa, telefone, whatsapp, email },
+      data: { nome, cpf, cnpj, empresa, telefone: whatsapp, whatsapp, email },
     });
   } else {
     cliente = await prisma.cliente.update({
       where: { cpf },
-      data: { nome, cnpj, empresa, telefone, whatsapp, email },
+      data: { nome, cnpj, empresa, telefone: whatsapp, whatsapp, email },
     });
   }
 

@@ -198,7 +198,7 @@ export default function ServicosPage() {
   const [modalidadeBacen, setModalidadeBacen]   = useState<ModalidadeBacen | null>(null);
 
   const [form, setForm] = useState({
-    nome: "", cpf: "", cnpj: "", empresa: "", telefone: "", whatsapp: "", email: "",
+    nome: "", cpf: "", cnpj: "", empresa: "", whatsapp: "", email: "",
   });
 
   const servico = servicos.find((s) => s.id === selected);
@@ -208,8 +208,8 @@ export default function ServicosPage() {
 
   const camposValidos =
     tipoPessoa === "pf"
-      ? form.nome && form.cpf && form.telefone && form.whatsapp
-      : form.empresa && form.cnpj && form.nome && form.telefone && form.whatsapp;
+      ? form.nome && form.cpf && form.whatsapp && form.email
+      : form.empresa && form.cnpj && form.nome && form.whatsapp && form.email;
 
   const handleSubmit = async () => {
     if (!camposValidos || !servico || !pedidoCalc) return;
@@ -220,7 +220,6 @@ export default function ServicosPage() {
         cpf: tipoPessoa === "pf" ? form.cpf : form.cpf || form.cnpj,
         cnpj: tipoPessoa === "pj" ? form.cnpj : undefined,
         empresa: tipoPessoa === "pj" ? form.empresa : undefined,
-        telefone: form.telefone,
         whatsapp: form.whatsapp,
         email: form.email || undefined,
         servico: servico.title,
@@ -588,11 +587,6 @@ export default function ServicosPage() {
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Telefone *</label>
-                    <input type="text" value={form.telefone} onChange={f("telefone")} placeholder="(00) 90000-0000"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
-                  </div>
-                  <div>
                     <label className="block text-sm text-gray-600 mb-1 flex items-center gap-1">
                       <MessageCircle className="w-3.5 h-3.5 text-green-500" />
                       WhatsApp *
@@ -600,8 +594,8 @@ export default function ServicosPage() {
                     <input type="text" value={form.whatsapp} onChange={f("whatsapp")} placeholder="(00) 90000-0000"
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm text-gray-600 mb-1">E-mail</label>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">E-mail * <span className="text-[10px] text-blue-600 font-medium">(confirmação de pagamento)</span></label>
                     <input type="email" value={form.email} onChange={f("email")} placeholder="seu@email.com"
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
                   </div>

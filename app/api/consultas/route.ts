@@ -5,19 +5,18 @@ import { gerarCodigoPedido } from "@/lib/pedido-utils";
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
-    nome, cpf, cnpj, empresa, telefone, whatsapp, email, itens,
+    nome, cpf, cnpj, empresa, whatsapp, email, itens,
   } = body as {
     nome: string;
     cpf: string;
     cnpj?: string;
     empresa?: string;
-    telefone: string;
-    whatsapp?: string;
+    whatsapp: string;
     email?: string;
     itens: { nome: string; valor: number }[];
   };
 
-  if (!nome || !cpf || !telefone || !itens?.length) {
+  if (!nome || !cpf || !whatsapp || !itens?.length) {
     return NextResponse.json({ error: "Dados obrigatórios faltando" }, { status: 400 });
   }
 
@@ -27,12 +26,12 @@ export async function POST(req: NextRequest) {
   let cliente = await prisma.cliente.findUnique({ where: { cpf } });
   if (!cliente) {
     cliente = await prisma.cliente.create({
-      data: { nome, cpf, cnpj, empresa, telefone, whatsapp, email },
+      data: { nome, cpf, cnpj, empresa, telefone: whatsapp, whatsapp, email },
     });
   } else {
     cliente = await prisma.cliente.update({
       where: { cpf },
-      data: { nome, cnpj, empresa, telefone, whatsapp, email },
+      data: { nome, cnpj, empresa, telefone: whatsapp, whatsapp, email },
     });
   }
 

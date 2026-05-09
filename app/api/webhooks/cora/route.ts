@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { enviarEmailConfirmacao } from "@/lib/email";
 import crypto from "crypto";
 
 /**
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
         { cartaoCobrancaId: cobrancaId },
       ],
     },
+    include: { cliente: true, itens: true },
   });
 
   if (!pedido) {
@@ -111,6 +113,18 @@ export async function POST(req: NextRequest) {
     ` (total acumulado: R$${novoValorPago}/${pedido.valorTotal})` +
     (novoPagoTotal ? " → em_andamento" : "")
   );
+
+  // Envia e-mail de confirmação quando o pagamento total for confirmado
+  if (novoPagoTotal && pedido.cliente.email) {
+    await enviarEmailConfirmacao({
+      clienteNome: pedido.cliente.nome,
+      clienteEmail: pedido.cliente.email,
+      pedidoCodigo: pedido.codigo,
+      pedidoTipo: pedido.tipo,
+      valorTotal: pedido.valorTotal,
+      itens: pedido.itens.map((i) => ({ nome: i.nome, valor: i.valor })),
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

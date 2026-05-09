@@ -14,7 +14,7 @@ model Cliente {
   cnpj      String?
   empresa   String?
   email     String?
-  telefone  String
+  telefone  String?
   whatsapp  String?
   createdAt DateTime @default(now())
   pedidos   Pedido[]

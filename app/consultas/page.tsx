@@ -86,7 +86,6 @@ export default function ConsultasPage() {
     cpf: "",
     cnpj: "",
     empresa: "",
-    telefone: "",
     whatsapp: "",
     email: "",
   });
@@ -135,8 +134,8 @@ export default function ConsultasPage() {
 
   const camposValidos =
     tipoPessoa === "pf"
-      ? form.nome && form.cpf && form.telefone && form.whatsapp
-      : form.empresa && form.cnpj && form.nome && form.telefone && form.whatsapp;
+      ? form.nome && form.cpf && form.whatsapp && form.email
+      : form.empresa && form.cnpj && form.nome && form.whatsapp && form.email;
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -161,7 +160,6 @@ export default function ConsultasPage() {
           cpf: tipoPessoa === "pf" ? form.cpf : form.cpf || form.cnpj,
           cnpj: tipoPessoa === "pj" ? form.cnpj : undefined,
           empresa: tipoPessoa === "pj" ? form.empresa : undefined,
-          telefone: form.telefone,
           whatsapp: form.whatsapp,
           email: form.email || undefined,
           itens,
@@ -401,12 +399,6 @@ export default function ConsultasPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Telefone *</label>
-                    <input type="text" value={form.telefone} onChange={f("telefone")} placeholder="(00) 90000-0000"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
-                  </div>
-
-                  <div>
                     <label className="block text-sm text-gray-600 mb-1 flex items-center gap-1.5">
                       <MessageCircle className="w-3.5 h-3.5 text-green-500" />
                       WhatsApp * <span className="text-[10px] text-green-600 font-medium">(para envio do relatório)</span>
@@ -415,8 +407,8 @@ export default function ConsultasPage() {
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm text-gray-600 mb-1">E-mail</label>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">E-mail * <span className="text-[10px] text-blue-600 font-medium">(confirmação de pagamento)</span></label>
                     <input type="email" value={form.email} onChange={f("email")} placeholder="seu@email.com"
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-600" />
                   </div>
