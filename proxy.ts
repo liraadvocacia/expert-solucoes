@@ -3,7 +3,7 @@ import { verificarToken, COOKIE_NAME_EXPORT } from "@/lib/session";
 
 const ROTA_LOGIN = "/admin/login";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Não bloqueia a própria página de login
