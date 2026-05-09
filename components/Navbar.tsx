@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Shield } from "lucide-react";
+import Image from "next/image";
+import { Menu, X } from "lucide-react";
 
 const links = [
   { href: "#servicos", label: "Serviços" },
@@ -17,16 +18,15 @@ export default function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-navy-800 rounded-lg flex items-center justify-center">
-            <Shield className="w-4 h-4 text-gold-500" />
-          </div>
-          <span className="font-bold text-navy-800 text-lg leading-tight">
-            Expert{" "}
-            <span className="font-normal text-sm text-navy-600 block leading-none">
-              Soluções Financeiras
-            </span>
-          </span>
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/logo-expert.png"
+            alt="Expert Soluções Financeiras"
+            width={160}
+            height={52}
+            className="h-10 w-auto object-contain"
+            priority
+          />
         </Link>
 
         {/* Desktop nav */}

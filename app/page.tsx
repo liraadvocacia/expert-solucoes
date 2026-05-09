@@ -16,7 +16,7 @@ export default function Home() {
         <ServicesSection />
         <HowItWorks />
         <WhyUs />
-        <FAQ />
+<FAQ />
         <CTABanner />
       </main>
       <Footer />

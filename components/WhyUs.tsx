@@ -1,4 +1,5 @@
-import { ShieldCheck, Clock, FileSignature, HeadphonesIcon, Lock, Award } from "lucide-react";
+import Image from "next/image";
+import { ShieldCheck, Clock, FileSignature, HeadphonesIcon, Lock, Award, Quote } from "lucide-react";
 
 const items = [
   {
@@ -50,7 +51,7 @@ export default function WhyUs() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {items.map((item) => (
             <div
               key={item.title}
@@ -63,6 +64,31 @@ export default function WhyUs() {
               <p className="text-sm text-navy-100 leading-relaxed">{item.desc}</p>
             </div>
           ))}
+        </div>
+
+        {/* Bloco de autoridade com foto do escritório */}
+        <div className="flex flex-col sm:flex-row items-center gap-6 bg-white/5 border border-gold-500/20 rounded-2xl p-6">
+          <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden flex-shrink-0 ring-2 ring-gold-500/40">
+            <Image
+              src="/foto-escritorio.jpg"
+              alt="Luiz Lira — Expert Soluções Financeiras"
+              fill
+              className="object-cover object-center"
+              sizes="80px"
+            />
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <Quote className="w-5 h-5 text-gold-400 mb-2 mx-auto sm:mx-0" />
+            <p className="text-navy-100 text-sm leading-relaxed italic">
+              "Com mais de 8 anos atuando no mercado financeiro, construímos a Expert com um
+              compromisso claro: entregar resultado real, com ética, contrato e total
+              transparência para cada cliente."
+            </p>
+            <p className="text-gold-400 text-sm font-semibold mt-3">
+              Luiz Lira{" "}
+              <span className="text-navy-100/60 font-normal">· Fundador da Expert Soluções Financeiras</span>
+            </p>
+          </div>
         </div>
       </div>
     </section>
