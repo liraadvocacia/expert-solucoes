@@ -16,18 +16,15 @@ import crypto from "crypto";
 function verificarAssinatura(payload: string, assinaturaHeader: string | null): boolean {
   const secret = process.env.CORA_WEBHOOK_SECRET;
 
-  // Se o secret não estiver configurado, loga aviso mas permite em dev
-  if (!secret) {
-    if (process.env.CORA_ENV === "production") {
-      console.error("[Cora Webhook] CORA_WEBHOOK_SECRET não configurado em produção!");
-      return false;
-    }
-    console.warn("[Cora Webhook] CORA_WEBHOOK_SECRET ausente — pulando verificação (dev mode)");
+  // Se a Cora não envia header de assinatura, permite (a Cora não assina webhooks por padrão)
+  if (!assinaturaHeader) {
+    console.log("[Cora Webhook] Sem header x-cora-signature — processando sem verificação HMAC");
     return true;
   }
 
-  if (!assinaturaHeader) {
-    console.warn("[Cora Webhook] Header x-cora-signature ausente");
+  // Se tiver header mas não tiver secret configurado, rejeita
+  if (!secret) {
+    console.error("[Cora Webhook] x-cora-signature presente mas CORA_WEBHOOK_SECRET não configurado");
     return false;
   }
 
@@ -44,7 +41,11 @@ function verificarAssinatura(payload: string, assinaturaHeader: string | null): 
     .digest("hex");
 
   // Comparação em tempo constante para evitar timing attacks
-  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(esperado, "hex"));
+  try {
+    return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(esperado, "hex"));
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
