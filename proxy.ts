@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "expert_admin_session";
-const ROTA_LOGIN = "/admin/login";
+const ROTA_LOGIN = "/login";
 
 async function verificarToken(token: string): Promise<boolean> {
   const secret = process.env.ADMIN_SESSION_SECRET;
