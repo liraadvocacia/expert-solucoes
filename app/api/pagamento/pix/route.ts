@@ -30,14 +30,28 @@ export async function POST(req: NextRequest) {
   // Valor a cobrar agora: entrada (50/50 ou boleto parcelado) ou total (à vista)
   const valorCobrar = pedido.valorEntrada ?? pedido.valorTotal;
 
-  // Se já tem cobrança PIX gerada, retorna sem recriar
+  // Se já tem cobrança PIX gerada, verifica se ainda é válida na API atual
   if (pedido.pixCobrancaId && pedido.pixEmv) {
-    return NextResponse.json({
-      cobrancaId: pedido.pixCobrancaId,
-      emv: pedido.pixEmv,
-      qrUrl: pedido.pixQrUrl,
-      valor: valorCobrar,
-    });
+    try {
+      const { buscarCobranca } = await import("@/lib/cora");
+      const cobranca = await buscarCobranca(pedido.pixCobrancaId);
+      // Cobrança existente e acessível — retorna sem recriar
+      if (cobranca.status !== "CANCELLED") {
+        return NextResponse.json({
+          cobrancaId: pedido.pixCobrancaId,
+          emv: pedido.pixEmv,
+          qrUrl: pedido.pixQrUrl,
+          valor: valorCobrar,
+        });
+      }
+    } catch {
+      // Falha ao buscar (ex: ID de staging na API de produção) — recria a cobrança
+      console.warn("[Cora PIX] Cobrança existente inválida — recriando:", pedido.pixCobrancaId);
+      await prisma.pedido.update({
+        where: { id: pedidoId },
+        data: { pixCobrancaId: null, pixEmv: null, pixQrUrl: null },
+      });
+    }
   }
 
   // Vencimento: D+3
