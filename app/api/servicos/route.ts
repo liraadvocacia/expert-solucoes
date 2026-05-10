@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         cnpj: cliente.cnpj,
         empresa: cliente.empresa,
         email: cliente.email,
-        telefone: cliente.telefone,
+        telefone: cliente.telefone ?? cliente.whatsapp ?? "",
         whatsapp: cliente.whatsapp,
       },
       servico: {
