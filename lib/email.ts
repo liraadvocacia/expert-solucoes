@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY não configurado");
+  return new Resend(key);
+}
 
 export interface DadosConfirmacao {
   clienteNome: string;
@@ -110,7 +114,11 @@ export async function enviarEmailConfirmacao(dados: DadosConfirmacao) {
 </html>`;
 
   try {
-    const { error } = await resend.emails.send({
+    if (!process.env.RESEND_API_KEY) {
+      console.warn("[Email] RESEND_API_KEY não configurado — e-mail não enviado");
+      return;
+    }
+    const { error } = await getResend().emails.send({
       from: "Expert Soluções Financeiras <confirmacao@expertsolucoes.com.br>",
       to: clienteEmail,
       subject: `✓ Pedido ${pedidoCodigo} confirmado — Expert Soluções Financeiras`,
