@@ -14,7 +14,7 @@ const consultas = [
     icon: FileSearch,
     title: "Consulta Nome Sujo",
     description:
-      "Verifique se há restrições no seu CPF/CNPJ junto aos órgãos de proteção ao crédito.",
+      "Verifique se há restrições no seu CPF/CNPJ junto ao SERASA, SPC, Boa Vista e Protestos em Cartório.",
     price: "R$ 49,90",
     tag: "Resultado em 24h",
     color: "text-blue-600",
@@ -47,7 +47,7 @@ const servicos = [
     icon: FileSearch,
     title: "Limpa Nome",
     description:
-      "Regularização completa de restrições no CPF/CNPJ com negociação e baixa dos débitos.",
+      "Regularização completa de restrições no CPF/CNPJ. Sem precisar pagar as dívidas. Baixa junto à SERASA, SPC, Boa Vista e Protestos em Cartório.",
     price: "R$ 699,00",
     details: "R$ 200 de entrada + restante na conclusão",
     highlight: "Garantia de reprotocolo",
@@ -71,7 +71,7 @@ const servicos = [
     icon: Building2,
     title: "Serviço BACEN",
     description:
-      "Regularização completa da sua situação junto ao Banco Central do Brasil.",
+      "Regularização cadastral junto ao SCR do Registrato e situação financeira junto ao Banco Central do Brasil.",
     price: "R$ 3.000,00",
     details: "Pagamento apenas na conclusão do serviço",
     highlight: "Pague só quando concluir",

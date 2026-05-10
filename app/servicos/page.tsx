@@ -81,13 +81,14 @@ const servicos = [
     icon: FileSearch,
     title: "Limpa Nome",
     description:
-      "Regularização completa de restrições no CPF/CNPJ com negociação e baixa dos débitos junto aos órgãos de proteção ao crédito.",
+      "Regularização completa de restrições no CPF/CNPJ. Sem precisar pagar as dívidas. Baixa junto à SERASA, SPC, Boa Vista e Protestos em Cartório.",
     prazo: "45 dias úteis",
     highlight: "Reprotocolo gratuito",
     includes: [
       "Análise completa das restrições",
-      "Negociação com credores",
-      "Baixa junto à Serasa, SPC e Boa Vista",
+      "Sem precisar pagar as dívidas",
+      "Baixa junto à SERASA, SPC e Boa Vista",
+      "Baixa de Protestos em Cartório",
       "Comprovante de regularização",
       "Reprotocolo gratuito em até 3 meses",
     ],
@@ -115,10 +116,11 @@ const servicos = [
     icon: Building2,
     title: "Serviço BACEN",
     description:
-      "Regularização completa da sua situação cadastral e financeira junto ao Banco Central do Brasil.",
+      "Regularização cadastral junto ao SCR do Registrato e situação financeira junto ao Banco Central do Brasil.",
     prazo: "90 dias úteis",
     highlight: "Entrada de apenas 50%",
     includes: [
+      "Regularização cadastral junto ao SCR do Registrato",
       "Análise da situação no BACEN",
       "Estratégia personalizada de regularização",
       "Elaboração e protocolo de documentação",

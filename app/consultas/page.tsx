@@ -27,9 +27,9 @@ const tiposConsulta = [
     id: "nome-sujo",
     icon: FileSearch,
     title: "Consulta Nome Sujo",
-    description: "Verificação completa de restrições no CPF/CNPJ junto aos órgãos de proteção ao crédito.",
+    description: "Verificação completa de restrições no CPF/CNPJ junto ao SERASA, SPC, Boa Vista e Protestos em Cartório.",
     price: 49.9,
-    includes: ["Situação junto à SERASA e SPC", "Análise de pendências financeiras", "Relatório exclusivo Expert"],
+    includes: ["Situação junto à SERASA, SPC e Boa Vista", "Protestos em Cartório", "Análise de pendências financeiras", "Relatório exclusivo Expert"],
     color: "blue",
   },
   {
