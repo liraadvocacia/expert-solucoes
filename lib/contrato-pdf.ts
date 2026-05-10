@@ -7,7 +7,11 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
-const UPLOADS_DIR = path.join(process.cwd(), "uploads", "contratos");
+// Em ambiente serverless (Vercel/Lambda) apenas /tmp é gravável.
+// Em desenvolvimento local usa uploads/contratos para persistência.
+const UPLOADS_DIR = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+  ? "/tmp/contratos"
+  : path.join(process.cwd(), "uploads", "contratos");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
