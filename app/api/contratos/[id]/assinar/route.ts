@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { aplicarAssinaturaPDF } from "@/lib/contrato-pdf";
+import { aplicarAssinaturaPDF, gerarContratoPDF, type DadosContrato } from "@/lib/contrato-pdf";
+import fs from "fs";
 
 /**
  * POST /api/contratos/[id]/assinar
@@ -31,7 +32,11 @@ export async function POST(
 
   const contrato = await prisma.contrato.findUnique({
     where: { id },
-    include: { pedido: true },
+    include: {
+      pedido: {
+        include: { cliente: true, itens: true },
+      },
+    },
   });
 
   if (!contrato) {
@@ -46,8 +51,53 @@ export async function POST(
     return NextResponse.json({ error: "Contrato já assinado" }, { status: 409 });
   }
 
-  if (!contrato.documentoPath) {
-    return NextResponse.json({ error: "PDF do contrato não gerado ainda" }, { status: 400 });
+  // ── Garante que o PDF existe no disco — regenera se necessário (Vercel serverless) ──
+  let documentoPath = contrato.documentoPath;
+  if (!documentoPath || !fs.existsSync(documentoPath)) {
+    const pedido = contrato.pedido;
+    const nomeItem = pedido.itens[0]?.nome ?? "Serviço";
+
+    const SERVICO_META: Record<string, { tipo: "limpa-nome" | "rating-bancario" | "bacen"; prazo: string }> = {
+      "Limpa Nome":      { tipo: "limpa-nome",      prazo: "até 45 dias úteis" },
+      "Rating Bancário": { tipo: "rating-bancario",  prazo: "até 60 dias úteis" },
+      "Serviço BACEN":   { tipo: "bacen",            prazo: "até 90 dias úteis" },
+    };
+    let meta: { tipo: "limpa-nome" | "rating-bancario" | "bacen"; prazo: string } = { tipo: "limpa-nome", prazo: "conforme contrato" };
+    for (const [chave, m] of Object.entries(SERVICO_META)) {
+      if (nomeItem.toLowerCase().includes(chave.toLowerCase())) { meta = m; break; }
+    }
+
+    const dadosContrato: DadosContrato = {
+      codigo:      pedido.codigo,
+      tipoServico: meta.tipo,
+      cliente: {
+        nome:     pedido.cliente.nome,
+        cpf:      pedido.cliente.cpf,
+        cnpj:     pedido.cliente.cnpj ?? undefined,
+        empresa:  pedido.cliente.empresa ?? undefined,
+        email:    pedido.cliente.email ?? undefined,
+        telefone: pedido.cliente.telefone ?? pedido.cliente.whatsapp ?? "",
+        whatsapp: pedido.cliente.whatsapp ?? undefined,
+      },
+      servico: {
+        nome:          nomeItem,
+        descricao:     nomeItem,
+        valorTotal:    pedido.valorTotal,
+        entrada:       (pedido as Record<string, unknown>).valorEntrada as number ?? 0,
+        restante:      pedido.valorTotal - (((pedido as Record<string, unknown>).valorEntrada as number) ?? 0),
+        prazoEstimado: meta.prazo,
+      },
+      dataEmissao: pedido.createdAt ?? new Date(),
+    };
+
+    try {
+      const gerado = await gerarContratoPDF(dadosContrato);
+      documentoPath = gerado.filePath;
+      await prisma.contrato.update({ where: { id }, data: { documentoPath, documentoHash: gerado.hash } });
+    } catch (err) {
+      console.error("[Assinatura] Erro ao regenerar PDF:", err);
+      return NextResponse.json({ error: "Não foi possível gerar o contrato. Tente novamente." }, { status: 500 });
+    }
   }
 
   // Captura IP e User-Agent
@@ -60,7 +110,7 @@ export async function POST(
 
   try {
     const { filePath, hash } = await aplicarAssinaturaPDF(
-      contrato.documentoPath,
+      documentoPath,
       { nomeAssinante, ip, userAgent, assinadoEm, assinaturaBase64 },
       contrato.pedido.codigo
     );
