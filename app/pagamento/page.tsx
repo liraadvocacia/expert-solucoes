@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Copy, Check, RefreshCw, QrCode, Clock, CheckCircle2,
@@ -27,6 +27,7 @@ type PagamentoState =
 
 function PagamentoContent() {
   const params      = useSearchParams();
+  const router      = useRouter();
   const pedidoId    = params.get("pedidoId");
   const codigo      = params.get("codigo");
   const formaParam  = params.get("forma") as Forma | null;   // pix | cartao | boleto
@@ -52,10 +53,10 @@ function PagamentoContent() {
       const res = await fetch(`/api/pedidos/${pedidoId}`);
       const data = await res.json();
       if (data.status === "em_andamento" || data.status === "concluido") {
-        setState({ fase: "pago" });
+        router.push(`/confirmacao?pedidoId=${pedidoId}&codigo=${codigo ?? ""}`);
       }
     } catch { /* silencioso */ }
-  }, [pedidoId]);
+  }, [pedidoId, codigo, router]);
 
   // ── Gerar PIX ─────────────────────────────────────────────────────────────
 
@@ -407,25 +408,14 @@ function PagamentoContent() {
           </div>
         )}
 
-        {/* ─── Pago ───────────────────────────────────────────────────────── */}
+        {/* ─── Pago — redireciona para /confirmacao ───────────────────────── */}
         {state.fase === "pago" && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              <CheckCircle2 className="w-8 h-8 text-emerald-600 animate-pulse" />
             </div>
-            <h2 className="text-2xl font-bold text-navy-800 mb-2">Pagamento confirmado!</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Seu pedido foi recebido. Nossa equipe já está trabalhando no seu caso.
-            </p>
-            {codigo && (
-              <p className="font-mono text-xs text-gray-400 mb-6">Protocolo: {codigo}</p>
-            )}
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors text-sm"
-            >
-              Voltar ao início
-            </Link>
+            <h2 className="text-xl font-bold text-navy-800 mb-2">Pagamento confirmado!</h2>
+            <p className="text-sm text-gray-500">Redirecionando...</p>
           </div>
         )}
 

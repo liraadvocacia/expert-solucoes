@@ -84,9 +84,21 @@ export async function POST(req: NextRequest) {
       parcelas,
     });
   } catch (err) {
-    console.error("[Cora Cartão] Erro ao criar cobrança:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[Cora Cartão] Erro ao criar cobrança:", msg);
+
+    // Mensagem amigável baseada no erro da Cora
+    let mensagem = "Erro ao gerar cobrança de cartão. Tente novamente.";
+    if (msg.includes("422") || msg.includes("payment_forms")) {
+      mensagem = "Pagamento por cartão não está habilitado nesta conta. Entre em contato pelo WhatsApp.";
+    } else if (msg.includes("401") || msg.includes("403")) {
+      mensagem = "Erro de autenticação com o gateway de pagamento. Entre em contato.";
+    } else if (msg.includes("400")) {
+      mensagem = "Dados inválidos para cobrança de cartão. Verifique os dados e tente novamente.";
+    }
+
     return NextResponse.json(
-      { error: "Erro ao gerar cobrança de cartão. Tente novamente." },
+      { error: mensagem, detalhe: msg },
       { status: 500 }
     );
   }
