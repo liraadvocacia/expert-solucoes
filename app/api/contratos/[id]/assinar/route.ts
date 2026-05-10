@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { aplicarAssinaturaPDF, gerarContratoPDF, type DadosContrato } from "@/lib/contrato-pdf";
+import { enviarEmailContratoAssinado } from "@/lib/email";
 import fs from "fs";
 
 /**
@@ -134,6 +135,20 @@ export async function POST(
       await prisma.pedido.update({
         where: { id: contrato.pedidoId },
         data: { status: "em_andamento" },
+      });
+    }
+
+    // Envia e-mail de confirmação de assinatura ao cliente
+    if (contrato.pedido.cliente.email) {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://expertsolucoes.com.br";
+      const contratoUrl = `${baseUrl}/api/contratos/${id}/documento?tipo=assinado&token=${token}`;
+      await enviarEmailContratoAssinado({
+        clienteNome:  contrato.pedido.cliente.nome,
+        clienteEmail: contrato.pedido.cliente.email,
+        pedidoCodigo: contrato.pedido.codigo,
+        nomeServico:  contrato.pedido.itens[0]?.nome ?? "Serviço",
+        assinadoEm,
+        contratoUrl,
       });
     }
 
