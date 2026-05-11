@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -33,6 +33,7 @@ function PagamentoContent() {
   const formaParam  = params.get("forma") as Forma | null;   // pix | cartao | boleto
   const valorParam  = params.get("valor");
   const parcelasParam = params.get("parcelas");
+  const tipoParam   = params.get("tipo");  // "consulta" | null
 
   const [state, setState]   = useState<PagamentoState>({ fase: "seletor" });
   const [formaAtual, setFormaAtual] = useState<Forma | null>(formaParam);
@@ -178,11 +179,11 @@ function PagamentoContent() {
 
             <p className="text-sm font-semibold text-gray-700 text-center">Escolha a forma de pagamento</p>
 
-            {[
+            {([
               { forma: "pix" as Forma,    icon: QrCode,     label: "PIX",                desc: "Aprovação instantânea" },
-              { forma: "cartao" as Forma, icon: CreditCard,  label: "Cartão de Crédito",  desc: parcelasExibido && parcelasExibido > 1 ? `Em ${parcelasExibido}× sem juros` : "À vista ou parcelado" },
+              ...(tipoParam !== "consulta" ? [{ forma: "cartao" as Forma, icon: CreditCard, label: "Cartão de Crédito", desc: parcelasExibido && parcelasExibido > 1 ? `Em ${parcelasExibido}× sem juros` : "À vista ou parcelado" }] : []),
               { forma: "boleto" as Forma, icon: FileText,    label: "Boleto Bancário",    desc: "Compensação em até 3 dias úteis" },
-            ].map(({ forma, icon: Icon, label, desc }) => (
+            ] as { forma: Forma; icon: React.ElementType; label: string; desc: string }[]).map(({ forma, icon: Icon, label, desc }) => (
               <button
                 key={forma}
                 onClick={() => setFormaAtual(forma)}

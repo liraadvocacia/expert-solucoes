@@ -166,7 +166,7 @@ export default function ConsultasPage() {
         }),
       });
       const data = await res.json();
-      router.push(`/pagamento?pedidoId=${data.id}&codigo=${data.codigo}`);
+      router.push(`/pagamento?pedidoId=${data.id}&codigo=${data.codigo}&tipo=consulta`);
     } catch {
       alert("Erro ao criar pedido. Tente novamente.");
     } finally {
