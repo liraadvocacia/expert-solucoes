@@ -17,7 +17,7 @@ const badges = [
 
 export default function Hero() {
   return (
-    <section className="relative min-h-[92vh] flex items-center bg-navy-800 overflow-hidden pt-16">
+    <section className="relative min-h-[92vh] flex items-center bg-navy-800 overflow-hidden pt-20">
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-10 pointer-events-none">
         <div
@@ -34,6 +34,18 @@ export default function Hero() {
 
           {/* — Coluna esquerda: texto — */}
           <div className="flex-1 text-center lg:text-left">
+            {/* Logo no hero */}
+            <div className="flex justify-center lg:justify-start mb-8">
+              <Image
+                src="/logo-expert-transparente.png"
+                alt="Expert Soluções Financeiras"
+                width={260}
+                height={85}
+                className="h-20 w-auto object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+
             {/* Badge topo */}
             <span className="inline-flex items-center gap-2 bg-white/10 border border-gold-500/30 text-gold-300 text-sm px-4 py-1.5 rounded-full mb-8">
               <CheckCircle className="w-4 h-4 flex-shrink-0" />
