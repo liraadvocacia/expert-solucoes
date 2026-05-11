@@ -55,6 +55,7 @@ model Pedido {
 
   itens     ItemPedido[]
   contrato  Contrato?
+  andamentos Andamento[]
 }
 
 model ItemPedido {
@@ -87,4 +88,14 @@ model Contrato {
 
   pedidoId String @unique
   pedido   Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+model Andamento {
+  id        String   @id @default(cuid())
+  titulo    String
+  descricao String?
+  createdAt DateTime @default(now())
+
+  pedidoId  String
+  pedido    Pedido @relation(fields: [pedidoId], references: [id])
 }

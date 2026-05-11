@@ -29,6 +29,9 @@ export default function Footer() {
           </p>
 
           <div className="flex gap-6 text-xs text-navy-100/40">
+            <Link href="/portal" className="hover:text-white transition-colors">
+              Portal do Cliente
+            </Link>
             <a href="#" className="hover:text-white transition-colors">
               Política de Privacidade
             </a>

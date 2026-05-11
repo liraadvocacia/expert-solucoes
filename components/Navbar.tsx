@@ -45,6 +45,12 @@ export default function Navbar() {
         {/* CTA */}
         <div className="hidden md:flex items-center gap-3">
           <Link
+            href="/portal"
+            className="text-sm text-navy-600 hover:text-navy-800 transition-colors"
+          >
+            Portal do Cliente
+          </Link>
+          <Link
             href="/admin"
             className="text-sm text-navy-600 hover:text-navy-800 transition-colors"
           >
