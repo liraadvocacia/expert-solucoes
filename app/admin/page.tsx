@@ -59,7 +59,10 @@ interface Pedido {
   valorTotal: number;
   valorPago: number;
   formaPagamento: string | null;
+  modalidade: string | null;
+  parcelas: number | null;
   pixCobrancaId: string | null;
+  boletoCobrancaId: string | null;
   pixEmv: string | null;
   createdAt: string;
   cliente: { id: string; nome: string; cpf: string; telefone: string; email: string | null };
@@ -84,6 +87,19 @@ const contratoStatusConfig: Record<string, { label: string; color: string; bg: s
 };
 
 const SERVICOS = ["Limpa Nome", "Rating Bancário", "Serviço BACEN"];
+
+function formaLabel(forma: string | null, parcelas: number | null): string {
+  if (!forma) return "—";
+  if (forma === "pix")        return "PIX";
+  if (forma === "boleto")     return "Boleto";
+  if (forma === "boleto_pix") return "Boleto + PIX";
+  if (forma === "cartao")     return parcelas ? `Cartão ${parcelas}×` : "Cartão";
+  return forma;
+}
+
+function podVerificarCora(forma: string | null): boolean {
+  return forma === "pix" || forma === "boleto" || forma === "boleto_pix";
+}
 
 /* ─────────── Small Components ─────────── */
 
@@ -146,6 +162,9 @@ export default function AdminPage() {
   // ── Modal ──
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null);
   const [loadingModal, setLoadingModal] = useState(false);
+
+  // ── Verificação Cora ──
+  const [verificandoCora, setVerificandoCora] = useState<string | null>(null);
 
   // ── Andamentos ──
   const [novoAndTitulo, setNovoAndTitulo] = useState("");
@@ -243,6 +262,24 @@ export default function AdminPage() {
       setNovoAndDesc("");
     } finally {
       setSalvandoAnd(false);
+    }
+  };
+
+  const verificarCora = async (pedidoId: string) => {
+    setVerificandoCora(pedidoId);
+    try {
+      const res  = await fetch(`/api/pedidos/${pedidoId}`);
+      const data = await res.json();
+      // Atualiza o pedido na lista
+      setPedidos((prev) => prev.map((p) => (p.id === pedidoId ? { ...p, ...data } : p)));
+      // Atualiza modal se estiver aberto para este pedido
+      if (pedidoSelecionado?.id === pedidoId) {
+        setPedidoSelecionado((prev) => (prev ? { ...prev, ...data } : prev));
+      }
+    } catch {
+      alert("Erro ao consultar Cora. Tente novamente.");
+    } finally {
+      setVerificandoCora(null);
     }
   };
 
@@ -467,6 +504,7 @@ export default function AdminPage() {
                       <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Cliente</th>
                       <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Serviço</th>
                       <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Financeiro</th>
+                      <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Pagamento</th>
                       <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Status</th>
                       <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Contrato</th>
                       <th className="text-left text-xs text-gray-500 font-medium px-5 py-3">Ações</th>
@@ -504,6 +542,32 @@ export default function AdminPage() {
                             {p.valorTotal > p.valorPago && p.valorPago > 0 && (
                               <div className="text-xs text-amber-600">Restam: {formatCurrency(p.valorTotal - p.valorPago)}</div>
                             )}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-medium text-navy-700">
+                                {formaLabel(p.formaPagamento, p.parcelas)}
+                              </span>
+                              {p.valorPago >= p.valorTotal && p.valorTotal > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 w-fit">
+                                  <CheckCircle2 className="w-3 h-3" />Pago
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 w-fit">
+                                  <Clock className="w-3 h-3" />Pendente
+                                </span>
+                              )}
+                              {p.status === "aguardando_pagamento" && podVerificarCora(p.formaPagamento) && (
+                                <button
+                                  onClick={() => verificarCora(p.id)}
+                                  disabled={verificandoCora === p.id}
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors disabled:opacity-50 mt-0.5"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${verificandoCora === p.id ? "animate-spin" : ""}`} />
+                                  {verificandoCora === p.id ? "Verificando…" : "Verificar Cora"}
+                                </button>
+                              )}
+                            </div>
                           </td>
                           <td className="px-5 py-3.5">
                             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>
@@ -841,6 +905,56 @@ export default function AdminPage() {
                     <div className="flex justify-between border-t border-gray-200 pt-2">
                       <span className="text-gray-500">Saldo restante</span>
                       <span className="font-semibold text-amber-600">{formatCurrency(pedidoSelecionado.valorTotal - pedidoSelecionado.valorPago)}</span>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Pagamento */}
+              <section>
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Pagamento</h4>
+                <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-3 text-sm">
+                  {/* Forma + status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">Forma de pagamento</span>
+                      <span className="font-semibold text-navy-800">
+                        {formaLabel(pedidoSelecionado.formaPagamento, pedidoSelecionado.parcelas)}
+                      </span>
+                    </div>
+                    {pedidoSelecionado.valorPago >= pedidoSelecionado.valorTotal && pedidoSelecionado.valorTotal > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Pago
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <Clock className="w-3.5 h-3.5" />
+                        Pendente
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Botão Verificar Cora */}
+                  {pedidoSelecionado.status === "aguardando_pagamento" && podVerificarCora(pedidoSelecionado.formaPagamento) && (
+                    <button
+                      onClick={() => verificarCora(pedidoSelecionado.id)}
+                      disabled={verificandoCora === pedidoSelecionado.id}
+                      className="flex items-center justify-center gap-2 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium py-2 rounded-xl transition-colors disabled:opacity-60"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${verificandoCora === pedidoSelecionado.id ? "animate-spin" : ""}`} />
+                      {verificandoCora === pedidoSelecionado.id ? "Consultando Cora…" : "Verificar pagamento na Cora"}
+                    </button>
+                  )}
+
+                  {/* Cartão: aviso de envio manual */}
+                  {pedidoSelecionado.formaPagamento === "cartao" && pedidoSelecionado.status === "aguardando_pagamento" && (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                      <MessageCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-medium text-amber-800">Pagamento via cartão</p>
+                        <p className="text-xs text-amber-600 mt-0.5">O link de pagamento deve ser enviado manualmente ao cliente pelo WhatsApp.</p>
+                      </div>
                     </div>
                   )}
                 </div>
