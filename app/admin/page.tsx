@@ -114,6 +114,7 @@ interface RatingFormData {
   capacidadeMensal: string;
   pontualidade: string;
   pontualidadeMax: string;
+  dataConsulta: string;
 }
 
 /* ─────────── Config ─────────── */
@@ -509,6 +510,9 @@ export default function AdminPage() {
       capacidadeMensal: d.capacidadeMensal?.toString() || "0",
       pontualidade:     d.pontualidade?.toString()     || "",
       pontualidadeMax:  d.pontualidadeMax?.toString()  || "100",
+      dataConsulta:     d.dataConsulta
+        ? new Date(d.dataConsulta).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
     });
     setRatingPendencias(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -533,7 +537,9 @@ export default function AdminPage() {
       capacidadeMensal: parseFloat(ratingDados.capacidadeMensal || "0"),
       pontualidade:     ratingDados.pontualidade ? parseFloat(ratingDados.pontualidade) : undefined,
       pontualidadeMax:  ratingDados.pontualidadeMax ? parseFloat(ratingDados.pontualidadeMax) : 100,
-      dataConsulta:     new Date().toISOString(),
+      dataConsulta:     ratingDados.dataConsulta
+        ? new Date(ratingDados.dataConsulta + "T12:00:00").toISOString()
+        : new Date().toISOString(),
       pendencias: ratingPendencias.map(p => ({
         tipo:    p.tipo,
         credor:  p.credor,
@@ -1393,6 +1399,7 @@ export default function AdminPage() {
                             {([
                               ["Nome do Analisado", "nomeCliente"],
                               ["CPF", "cpf"],
+                              ["Data da Consulta KSI", "dataConsulta"],
                               ["Classificação", "classificacao"],
                               ["Descrição", "descricaoClasse"],
                               ["Renda Presumida (R$)", "rendaPresumida"],
@@ -1401,7 +1408,7 @@ export default function AdminPage() {
                               ["Pontualidade", "pontualidade"],
                               ["Score Máximo", "pontualidadeMax"],
                             ] as [string, keyof RatingFormData][]).map(([label, key]) => (
-                              <div key={key} className={key === "nomeCliente" ? "col-span-2" : ""}>
+                              <div key={key} className={key === "nomeCliente" || key === "descricaoClasse" ? "col-span-2" : ""}>
                                 <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
                                 {key === "classificacao" ? (
                                   <select
@@ -1414,6 +1421,13 @@ export default function AdminPage() {
                                       <option key={g} value={g}>{g}</option>
                                     ))}
                                   </select>
+                                ) : key === "dataConsulta" ? (
+                                  <input
+                                    type="date"
+                                    value={ratingDados[key] || ""}
+                                    onChange={e => setRatingDados(d => ({ ...d, [key]: e.target.value }))}
+                                    className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                  />
                                 ) : (
                                   <input
                                     type="text"

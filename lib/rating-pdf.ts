@@ -630,6 +630,7 @@ export async function gerarRelatorioRatingPDF(dados: DadosRating): Promise<{
   r.dadosAnalisadoBox([
     ["Nome Completo", dados.nomeCliente],
     ["CPF",           dados.cpf],
+    ["Data Consulta KSI", fmtData(dados.dataConsulta)],
   ]);
 
   // ──────────────────────────────────────────────────────────────────────────

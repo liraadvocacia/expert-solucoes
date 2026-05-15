@@ -69,6 +69,7 @@ export async function POST(
       pontualidade:     dados.pontualidade,
       pontualidadeMax:  dados.pontualidadeMax  ?? 100,
       pendencias:       dados.pendencias       ?? [],
+      dataConsulta:     dados.dataConsulta     ? dados.dataConsulta.toISOString() : null,
     },
   });
 }

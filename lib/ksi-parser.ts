@@ -1,11 +1,12 @@
 /**
  * KSI Consultas PDF Parser
- * Best-effort extraction of rating data from raw PDF text.
+ * Extração automática de TODOS os dados do relatório KSI para pré-preenchimento.
  *
- * Padrões baseados na estrutura real extraída via pdfjs-dist:
+ * Padrões reais (pdfjs-dist, items joined com " "):
  *  Pág 1: "Nome   FULANO DA SILVA   Número CPF   000.000.000-00"
  *          "Conclusão de Análise Inteligente:   Reprovado"
  *          "CLASSIFICAÇÃO DO RISCO DE CRÉDITO  C-"
+ *          "Data 13/05/2026" (ou similar)
  *  Pág 2: "COMPROMETIMENTO DE RENDA  100%"
  *  Pág 4: "CAPACIDADE MENSAL DE PAGAMENTO  R$: 0,00"
  *          "RGI do Brasil   1   R$ 1.190,00"
@@ -17,6 +18,7 @@
  *          "01-CARTORIO DE PROTESTO DE TITULOS...PEDRO CANaRIO   R$: 643.51"
  *  Pág 6: "Créditos baixados como prejuízo até 12 meses   R$ 1.920,00"
  *          "PREJUIZO AO SISTEMA FINANCEIRO (C)  R$ 1.920,00"
+ *          "Crédito Pessoal sem Consignação   R$ 1.920,00"
  */
 
 import type { DadosRating, PendenciaRating } from "./rating-pdf";
@@ -25,23 +27,47 @@ import type { DadosRating, PendenciaRating } from "./rating-pdf";
 
 /**
  * Converte "R$ 4.296,00" ou "4.296,00" ou "4296.00" → 4296
- * Suporta tanto formato BR (ponto milhar, vírgula decimal) quanto EN (ponto decimal).
+ * Suporta formato BR (ponto milhar, vírgula decimal) e EN (ponto decimal).
  */
 function parseBRL(raw: string): number {
-  // Remove "R$", "R$:", espaços
   const s = raw.replace(/R\$[:\s]*/g, "").trim();
-  // Formato BR: tem vírgula como decimal → remove pontos de milhar, troca vírgula
   if (s.includes(",")) {
     return parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0;
   }
-  // Formato EN/misto: ponto como decimal (ex: "643.51")
   return parseFloat(s.replace(/[^\d.]/g, "")) || 0;
+}
+
+/**
+ * Converte "DD/MM/YYYY" → Date  |  undefined
+ */
+function parseDDMMYYYY(str: string): Date | undefined {
+  const m = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return undefined;
+  const d = new Date(`${m[3]}-${m[2]}-${m[1]}`);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
+/**
+ * Limpeza básica de string (remove espaços extras, strip R$ trailing, etc.)
+ */
+function limpar(str: string): string {
+  return str
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+R\$[\s\d.,]+$/, "")   // strip trailing "R$ 1.920,00"
+    .trim();
 }
 
 // ─── Main parser ─────────────────────────────────────────────────────────────
 
 export function parseKsiText(rawText: string): Partial<DadosRating> {
   const text = rawText;
+
+  // ── Data da consulta KSI ──────────────────────────────────────────────────
+  // Pág 1: "Data 13/05/2026"  /  "Data de Emissão: 13/05/2026"  / primeira data
+  let dataConsulta: Date | undefined;
+  const dataKsiM = text.match(/Data(?:\s+d[aeo]?\s+\w+)?[:\s]+(\d{2}\/\d{2}\/\d{4})/i)
+    ?? text.match(/(\d{2}\/\d{2}\/\d{4})/);
+  if (dataKsiM) dataConsulta = parseDDMMYYYY(dataKsiM[1]);
 
   // ── Nome ──────────────────────────────────────────────────────────────────
   // Padrão: "Nome   GIUMARIO DA COSTA PEREIRA   Número CPF"
@@ -52,13 +78,11 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   if (nomeM) {
     nomeCliente = nomeM[1].trim();
   } else {
-    // fallback: "Nome do Analisado: FULANO"
     const fbM = text.match(/Nome(?:\s+do\s+Analisado)?[:\s]+([A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][^\n\r]{4,70})/i);
     if (fbM) nomeCliente = fbM[1].trim();
   }
 
   // ── CPF ───────────────────────────────────────────────────────────────────
-  // Padrão: "Número CPF   068.138.776-90"  ou qualquer CPF no documento
   let cpf = "";
   const cpfM = text.match(/N[uú]mero\s+CPF\s+([\d]{3}\.[\d]{3}\.[\d]{3}-[\d]{2})/i)
     ?? text.match(/CPF[:\s]*([\d]{3}\.[\d]{3}\.[\d]{3}-[\d]{2})/i)
@@ -66,8 +90,8 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   if (cpfM) cpf = cpfM[1].trim();
 
   // ── Classificação ─────────────────────────────────────────────────────────
-  // Padrão pág 1: "CLASSIFICAÇÃO DO RISCO DE CRÉDITO  C-"
-  // Padrão pág 5: "Classificação do Risco de Crédito   C-"
+  // Pág 1: "CLASSIFICAÇÃO DO RISCO DE CRÉDITO  C-"
+  // Pág 5: "Classificação do Risco de Crédito   C-"
   let classificacao = "";
   const classM = text.match(
     /CLASSIFICA[ÇC][AÃ]O DO RISCO DE CR[ÉE]DITO\s+([A-C][+-]?)/i
@@ -77,7 +101,7 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   if (classM) classificacao = classM[1].trim().toUpperCase();
 
   // ── Descrição da classe ────────────────────────────────────────────────────
-  // Padrão pág 1: "Conclusão de Análise Inteligente:   Reprovado"
+  // Pág 1: "Conclusão de Análise Inteligente:   Reprovado"
   let descricaoClasse = "";
   const descM = text.match(
     /Conclus[aã]o de An[aá]lise Inteligente[:\s]+([A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][^\s\n\r][^\n\r]{0,40})/i
@@ -85,66 +109,66 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   if (descM) {
     descricaoClasse = descM[1].trim();
   } else if (classificacao) {
-    // Fallback: mapeamento padrão KSI (sem "D")
     const map: Record<string, string> = {
-      "A+": "Excelente", "A": "Ótimo",    "A-": "Muito Bom",
-      "B+": "Bom",       "B": "Regular",  "B-": "Abaixo do Regular",
+      "A+": "Excelente", "A": "Ótimo",     "A-": "Muito Bom",
+      "B+": "Bom",       "B": "Regular",   "B-": "Abaixo do Regular",
       "C+": "Fraco",     "C": "Muito Fraco", "C-": "Reprovado",
     };
     descricaoClasse = map[classificacao] ?? "";
   }
 
   // ── Comprometimento de renda ───────────────────────────────────────────────
-  // Padrão pág 2: "COMPROMETIMENTO DE RENDA  100%"
+  // Pág 2: "COMPROMETIMENTO DE RENDA  100%"
   let comprometimento = 0;
   const comprM = text.match(/COMPROMETIMENTO DE RENDA\s+([\d]+)\s*%/i)
     ?? text.match(/Comprometimento(?:\s+de\s+Renda)?\s+([\d]+(?:[.,]\d+)?)\s*%/i);
   if (comprM) comprometimento = parseFloat(comprM[1].replace(",", ".")) || 0;
 
   // ── Capacidade mensal de pagamento ────────────────────────────────────────
-  // Padrão pág 4: "CAPACIDADE MENSAL DE PAGAMENTO  R$: 0,00"
+  // Pág 4: "CAPACIDADE MENSAL DE PAGAMENTO  R$: 0,00"
   let capacidadeMensal = 0;
   const capM = text.match(/CAPACIDADE MENSAL DE PAGAMENTO\s+R\$[:\s]*([\d.,]+)/i)
     ?? text.match(/Capacidade\s+(?:Mensal|de\s+Pagamento)(?:\s+Mensal)?[:\s]+R?\$?[:\s]*([\d.,]+)/i);
   if (capM) capacidadeMensal = parseBRL(capM[1]);
 
   // ── Renda presumida ───────────────────────────────────────────────────────
-  // Padrão pág 4: "Renda Presumida   -   R$: 4.296,00"
+  // Pág 4: "Renda Presumida   -   R$: 4.296,00"
   let rendaPresumida = 0;
   const rendaM = text.match(/Renda\s+Presumida\s+[-–]\s+R\$[:\s]*([\d.,]+)/i)
     ?? text.match(/Renda\s+Presumida[:\s]+R?\$?[:\s]*([\d.,]+)/i);
   if (rendaM) rendaPresumida = parseBRL(rendaM[1]);
 
   // ── Pontualidade ──────────────────────────────────────────────────────────
-  // Padrão pág 5: "Pontualidade de Pagamento   17.41"
+  // Pág 5: "Pontualidade de Pagamento   17.41"
   let pontualidade: number | undefined;
   const pontualidadeMax = 100;
   const pontM = text.match(/Pontualidade de Pagamento\s+([\d.,]+)/i);
-  if (pontM) {
-    const raw = pontM[1].replace(",", ".");
-    pontualidade = parseFloat(raw) || undefined;
-  }
+  if (pontM) pontualidade = parseFloat(pontM[1].replace(",", ".")) || undefined;
 
   // ── Pendências ────────────────────────────────────────────────────────────
   const pendencias: PendenciaRating[] = [];
 
   // ── RGI / Negativações ────────────────────────────────────────────────────
   // Pág 5: "NAO INFORMADO   PINHEIRO MOVEIS   R$ 1.190,00"
-  // Formato: (DATA|NAO INFORMADO)   CREDOR   R$ VALOR
-  const rgiDetailRe = /(?:NAO INFORMADO|\d{2}\/\d{2}\/\d{4})\s{1,6}([A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][\w\sÁÉÍÓÚÀÂÊÔÃÕÜÇáéíóúàâêôãõüç.'-]{2,60}?)\s{1,6}R\$[:\s]*([\d.,]+)/gi;
+  //         "12/03/2023   LOJA DAS FLORES   R$ 500,00"
+  // Captura: grupo 1 = dataRef, grupo 2 = credor, grupo 3 = valor
+  const rgiDetailRe = /(NAO INFORMADO|\d{2}\/\d{2}\/\d{4})\s{1,8}([A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][\w\sÁÉÍÓÚÀÂÊÔÃÕÜÇáéíóúàâêôãõüç.'-]{2,60}?)\s{1,8}R\$[:\s]*([\d.,]+)/gi;
   let m: RegExpExecArray | null;
   while ((m = rgiDetailRe.exec(text)) !== null) {
-    const credor = m[1].trim();
-    const valor  = parseBRL(m[2]);
-    if (valor > 0) pendencias.push({ tipo: "RGI", credor, valor });
+    const dataRef = m[1] === "NAO INFORMADO" ? "Não informado" : m[1];
+    const credor  = limpar(m[2]);
+    const valor   = parseBRL(m[3]);
+    if (valor > 0) pendencias.push({ tipo: "RGI", credor, valor, dataRef });
   }
 
   // ── Protestos ─────────────────────────────────────────────────────────────
-  // Pág 5: "01-CARTORIO DE PROTESTO DE TITULOS...PEDRO CANaRIO   R$: 643.51"
+  // Pág 5: "01-CARTORIO DE PROTESTO DE TITULOS E DOCUMENTOS PEDRO CANARIO   R$: 643.51"
   // Formato: NN-NOME DO CARTORIO... CIDADE   R$: VALOR
-  const protestoDetailRe = /\b(\d{2,3}-[A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][\w\sÁÉÍÓÚÀÂÊÔÃÕÜÇáéíóúàâêôãõüç.'-]{5,120}?)\s{1,6}R\$[:\s]*([\d.,]+)/gi;
+  // Remove o prefixo "01-" (número de ordem)
+  const protestoDetailRe = /\b(\d{2,3}-[A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][\w\sÁÉÍÓÚÀÂÊÔÃÕÜÇáéíóúàâêôãõüç.'-]{5,120}?)\s{1,8}R\$[:\s]*([\d.,]+)/gi;
   while ((m = protestoDetailRe.exec(text)) !== null) {
-    const credor = m[1].trim();
+    // Strip o prefixo numérico "01-", "02-" etc.
+    const credor = limpar(m[1]).replace(/^\d{2,3}-\s*/, "");
     const valor  = parseBRL(m[2]);
     if (valor > 0) pendencias.push({ tipo: "Protesto", credor, valor });
   }
@@ -152,7 +176,7 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   // ── SCR / Crédito em Prejuízo ─────────────────────────────────────────────
   // Pág 6: "Créditos baixados como prejuízo até 12 meses   R$ 1.920,00"
   //         "PREJUIZO AO SISTEMA FINANCEIRO (C)  R$ 1.920,00"
-  // Tentamos achar o tipo de crédito (ex: "Crédito Pessoal sem Consignação")
+  //         "Crédito Pessoal sem Consignação   R$ 1.920,00"
   const scrValorM = text.match(
     /Cr[eé]ditos?\s+baixados?\s+como\s+prej[uú][íi]zo[^\n\r]*R\$[:\s]*([\d.,]+)/i
   ) ?? text.match(
@@ -161,12 +185,12 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   if (scrValorM) {
     const valor = parseBRL(scrValorM[1]);
     if (valor > 0) {
-      // Tenta extrair o tipo/credor: linha seguinte ou próxima com nome do crédito
+      // Tenta extrair o tipo específico do crédito em prejuízo
       const credorM = text.match(
-        /(?:Cr[eé]dito\s+Pessoal|Cr[eé]dito\s+Consignado|Financiamento|Empréstimo)[^\n\r]{0,60}/i
+        /(?:Cr[eé]dito\s+Pessoal|Cr[eé]dito\s+Consignado|Cr[eé]dito\s+Imobili[aá]rio|Financiamento|Empr[eé]stimo|Cart[aã]o\s+de\s+Cr[eé]dito)[^\n\r]{0,80}/i
       );
       const credor = credorM
-        ? credorM[0].trim().replace(/\s{2,}/g, " ")
+        ? limpar(credorM[0])
         : "Crédito Pessoal sem Consignação";
       pendencias.push({ tipo: "SCR — Crédito em Prejuízo", credor, valor });
     }
@@ -183,5 +207,6 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
     pontualidade,
     pontualidadeMax,
     pendencias,
+    dataConsulta,
   };
 }
