@@ -273,15 +273,10 @@ export default function AssinarPage({ params }: { params: Promise<{ token: strin
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-navy-800 text-sm">Contrato de Prestação de Serviços</h3>
-              <a
-                href={`/api/contratos/${contrato.id}/documento?tipo=original`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-navy-600 hover:text-navy-800 flex items-center gap-1 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Baixar PDF
-              </a>
+              <span className="text-xs text-amber-600 flex items-center gap-1 font-medium">
+                <Lock className="w-3.5 h-3.5" />
+                Disponível após assinar
+              </span>
             </div>
             {/* Embed do PDF */}
             <div className="relative" style={{ height: 500 }}>

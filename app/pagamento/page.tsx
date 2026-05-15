@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   Copy, Check, RefreshCw, QrCode, Clock, CheckCircle2,
   AlertCircle, ArrowLeft, Smartphone, CreditCard, FileText,
-  ExternalLink, Loader2,
+  ExternalLink, Loader2, FileSignature, Lock,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -38,6 +38,29 @@ function PagamentoContent() {
   const [state, setState]   = useState<PagamentoState>({ fase: "seletor" });
   const [formaAtual, setFormaAtual] = useState<Forma | null>(formaParam);
   const [copiado, setCopiado]       = useState(false);
+
+  // ── Verificação de contrato não assinado ──────────────────────────────────
+  const [contratoNaoAssinado, setContratoNaoAssinado] = useState<{
+    signingToken: string;
+  } | null>(null);
+  const [verificandoContrato, setVerificandoContrato] = useState(false);
+
+  useEffect(() => {
+    // Só bloqueia para serviços (tipo !== "consulta")
+    if (!pedidoId || tipoParam === "consulta") return;
+    setVerificandoContrato(true);
+    fetch(`/api/pedidos/${pedidoId}`)
+      .then((r) => r.json())
+      .then((pedido) => {
+        const contrato = pedido?.contrato;
+        if (contrato && contrato.status !== "assinado" && contrato.signingToken) {
+          setContratoNaoAssinado({ signingToken: contrato.signingToken });
+        }
+      })
+      .catch(() => { /* continua normalmente se falhar */ })
+      .finally(() => setVerificandoContrato(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoId]);
 
   // Se vier ?forma= na URL, carrega automaticamente sem mostrar seletor
   useEffect(() => {
@@ -144,6 +167,52 @@ function PagamentoContent() {
     if (formaAtual === "boleto") return "Pagamento via Boleto";
     return "Pagamento";
   })();
+
+  // ── Bloqueia pagamento se contrato ainda não foi assinado ────────────────
+  if (verificandoContrato) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (contratoNaoAssinado) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <FileSignature className="w-8 h-8 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-bold text-navy-800 mb-3">
+            Assine o contrato primeiro
+          </h2>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            Para prosseguir com o pagamento, é necessário ler e assinar o
+            contrato de prestação de serviços. A assinatura é digital e leva
+            menos de 1 minuto.
+          </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-start gap-2 text-left">
+            <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 leading-relaxed">
+              O pagamento só é liberado após a confirmação da assinatura,
+              garantindo segurança jurídica para ambas as partes.
+            </p>
+          </div>
+          <a
+            href={`/assinar/${contratoNaoAssinado.signingToken}`}
+            className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-semibold py-3.5 rounded-xl transition-colors text-sm"
+          >
+            <FileSignature className="w-4 h-4" />
+            Ir para assinatura do contrato
+          </a>
+          {codigo && (
+            <p className="text-xs text-gray-400 mt-4 font-mono">Pedido: {codigo}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
