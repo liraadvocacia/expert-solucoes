@@ -61,8 +61,16 @@ export async function criarLinkPagamento(params: {
     webhook_url: params.webhookUrl,
     customer: {
       name: params.cliente.nome,
-      ...(params.cliente.email    ? { email:        params.cliente.email    } : {}),
-      ...(params.cliente.telefone ? { phone_number: params.cliente.telefone } : {}),
+      // Inclui email apenas se passar validação básica (formato name@domain.tld)
+      ...(params.cliente.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(params.cliente.email.trim())
+        ? { email: params.cliente.email.trim() }
+        : {}),
+      // Inclui telefone apenas se tiver dígitos suficientes; adiciona + se necessário
+      ...(params.cliente.telefone && params.cliente.telefone.replace(/\D/g, "").length >= 10
+        ? { phone_number: params.cliente.telefone.startsWith("+")
+              ? params.cliente.telefone
+              : `+${params.cliente.telefone.replace(/\D/g, "")}` }
+        : {}),
     },
   };
 
