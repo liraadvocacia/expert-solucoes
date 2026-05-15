@@ -34,7 +34,8 @@ export async function POST(
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // Usa pdfjs-dist (ESM) via dynamic import — compatível com Next.js App Router
-    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfjsLib = await import("pdfjs-dist");
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
     const doc = await loadingTask.promise;
 
