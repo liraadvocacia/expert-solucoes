@@ -203,9 +203,14 @@ export default function AdminPage() {
     empresa: "",
     servico: "Limpa Nome",
     valor: "",
+    entrada: "",          // valor da entrada (boleto_parcelado)
     faixaCredito: "ate_100k",
     formaPagamento: "pix",
   });
+
+  // Corrigir valorPago manualmente no modal
+  const [editandoValorPago, setEditandoValorPago] = useState(false);
+  const [novoValorPagoInput, setNovoValorPagoInput] = useState("");
   const [salvandoCliente, setSalvandoCliente] = useState(false);
   const [erroCliente, setErroCliente] = useState("");
   const [pedidoCriado, setPedidoCriado] = useState<{ codigo: string; id: string } | null>(null);
@@ -253,6 +258,8 @@ export default function AdminPage() {
     setApagarFase("idle");
     setConfirmacaoApagar("");
     setApagarErro("");
+    setEditandoValorPago(false);
+    setNovoValorPagoInput("");
   };
 
   const apagarPedido = async () => {
@@ -410,7 +417,7 @@ export default function AdminPage() {
           email:       form.email.trim() || undefined,
           servico:     form.servico,
           valor:       parseFloat(form.valor.replace(",", ".")),
-          entrada:     0,
+          entrada:     form.entrada ? parseFloat(form.entrada.replace(",", ".")) : 0,
           modalidade,
           parcelas,
           faixaCredito: form.servico === "Rating Bancário" ? form.faixaCredito : undefined,
@@ -424,7 +431,7 @@ export default function AdminPage() {
         setForm({
           nome: "", cpf: "", whatsapp: "", email: "",
           cnpj: "", empresa: "", servico: "Limpa Nome",
-          valor: "", faixaCredito: "ate_100k", formaPagamento: "pix",
+          valor: "", entrada: "", faixaCredito: "ate_100k", formaPagamento: "pix",
         });
         fetchPedidos();
       }
@@ -885,7 +892,10 @@ export default function AdminPage() {
                       <button
                         key={val}
                         type="button"
-                        onClick={() => setForm({ ...form, formaPagamento: val })}
+                        onClick={() => {
+                          const novaEntrada = val === "boleto" && form.servico === "Limpa Nome" ? "200" : "";
+                          setForm({ ...form, formaPagamento: val, entrada: novaEntrada });
+                        }}
                         className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
                           form.formaPagamento === val
                             ? "bg-navy-800 text-white border-navy-800"
@@ -896,6 +906,27 @@ export default function AdminPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Campo de entrada — visível apenas para boleto parcelado */}
+                  {form.formaPagamento === "boleto" && (
+                    <div className="mt-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                      <label className="block text-xs font-medium text-blue-700 mb-1">
+                        Valor da entrada (R$) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={form.entrada}
+                        onChange={(e) => setForm({ ...form, entrada: e.target.value })}
+                        placeholder="Ex: 200,00"
+                        className="w-full border border-blue-200 bg-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy-600"
+                      />
+                      <p className="text-xs text-blue-600 mt-1.5">
+                        O restante será cobrado em 2 parcelas de boleto — 30 e 60 dias após a assinatura do contrato.
+                      </p>
+                    </div>
+                  )}
+
                   <p className="text-xs text-gray-400 mt-3">
                     O pagamento poderá ser gerenciado manualmente no painel.
                   </p>
@@ -1331,8 +1362,9 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {/* Pagamento manual */}
-                  {pedidoSelecionado.valorPago < pedidoSelecionado.valorTotal && (
+                  {/* Pagamento manual — entrada (boleto_parcelado) ou total (demais) */}
+                  {pedidoSelecionado.valorPago < pedidoSelecionado.valorTotal &&
+                   pedidoSelecionado.modalidade !== "boleto_parcelado" && (
                     <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3 border border-amber-100">
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-amber-600" />
@@ -1356,6 +1388,77 @@ export default function AdminPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* boleto_parcelado: confirmar só a entrada */}
+                  {pedidoSelecionado.modalidade === "boleto_parcelado" &&
+                   pedidoSelecionado.valorEntrada != null &&
+                   pedidoSelecionado.valorPago < pedidoSelecionado.valorEntrada && (
+                    <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3 border border-amber-100">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-amber-600" />
+                        <div>
+                          <p className="text-xs font-medium text-amber-800">
+                            Confirmar entrada paga — {formatCurrency(pedidoSelecionado.valorEntrada)}
+                          </p>
+                          <p className="text-xs text-amber-600">As parcelas de boleto são confirmadas separadamente acima</p>
+                        </div>
+                      </div>
+                      <button
+                        disabled={atualizando}
+                        onClick={() =>
+                          atualizarStatus(
+                            pedidoSelecionado,
+                            pedidoSelecionado.status,
+                            pedidoSelecionado.valorEntrada!
+                          )
+                        }
+                        className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60"
+                      >
+                        Confirmar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Corrigir valorPago manualmente */}
+                  <div className="border border-gray-200 rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-gray-600">Corrigir valor pago</p>
+                      <button
+                        onClick={() => {
+                          setEditandoValorPago(!editandoValorPago);
+                          setNovoValorPagoInput(String(pedidoSelecionado.valorPago));
+                        }}
+                        className="text-xs text-navy-600 hover:text-navy-800 transition-colors"
+                      >
+                        {editandoValorPago ? "Cancelar" : "Editar"}
+                      </button>
+                    </div>
+                    {editandoValorPago && (
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={novoValorPagoInput}
+                          onChange={(e) => setNovoValorPagoInput(e.target.value)}
+                          className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-navy-600"
+                          placeholder="0.00"
+                        />
+                        <button
+                          disabled={atualizando}
+                          onClick={async () => {
+                            const novoVal = parseFloat(novoValorPagoInput);
+                            if (isNaN(novoVal) || novoVal < 0) return;
+                            await atualizarStatus(pedidoSelecionado, pedidoSelecionado.status, novoVal);
+                            setEditandoValorPago(false);
+                          }}
+                          className="text-xs bg-navy-800 hover:bg-navy-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* PIX EMV */}
                   {pedidoSelecionado.pixEmv && (
