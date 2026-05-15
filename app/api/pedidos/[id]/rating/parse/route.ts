@@ -43,13 +43,33 @@ export async function POST(
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item) => ("str" in item ? (item as { str: string }).str : ""))
-        .join(" ");
+      // Usa hasEOL para preservar quebras de linha reais do PDF,
+      // adicionando espaço entre itens na mesma linha.
+      // Isso produz texto muito mais próximo ao layout original.
+      let pageText = "";
+      for (const item of content.items) {
+        if (!("str" in item)) continue;
+        const str = (item as { str: string; hasEOL?: boolean }).str;
+        const eol = (item as { str: string; hasEOL?: boolean }).hasEOL ?? false;
+        pageText += str + (eol ? "\n" : " ");
+      }
       rawText += pageText + "\n";
     }
 
     dados = parseKsiText(rawText);
+
+    // Debug: loga campos chave extraídos para facilitar diagnóstico
+    console.log("[rating/parse] Extração concluída:", {
+      nomeCliente:      dados.nomeCliente,
+      cpf:              dados.cpf,
+      classificacao:    dados.classificacao,
+      comprometimento:  dados.comprometimento,
+      capacidadeMensal: dados.capacidadeMensal,
+      rendaPresumida:   dados.rendaPresumida,
+      pontualidade:     dados.pontualidade,
+      dataConsulta:     dados.dataConsulta,
+      pendencias:       dados.pendencias?.length,
+    });
   } catch (err) {
     // Falha silenciosa — retorna objeto vazio, admin preenche manualmente
     console.warn("[rating/parse] Falha ao processar PDF:", (err as Error).message);
