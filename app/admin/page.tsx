@@ -29,6 +29,8 @@ import {
   Trash2,
   ChevronRight,
   Users,
+  Calendar,
+  Banknote,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -41,6 +43,15 @@ interface Andamento {
   titulo: string;
   descricao: string | null;
   createdAt: string;
+}
+
+interface ParcelaBoleto {
+  id: string;
+  numero: number;
+  valor: number;
+  vencimento: string;
+  pagoEm: string | null;
+  observacao: string | null;
 }
 
 interface Contrato {
@@ -61,6 +72,7 @@ interface Pedido {
   formaPagamento: string | null;
   modalidade: string | null;
   parcelas: number | null;
+  valorEntrada: number | null;
   pixCobrancaId: string | null;
   boletoCobrancaId: string | null;
   pixEmv: string | null;
@@ -69,6 +81,7 @@ interface Pedido {
   itens: { id: string; nome: string; valor: number }[];
   contrato: Contrato | null;
   andamentos?: Andamento[];
+  parcelasBoleto?: ParcelaBoleto[];
 }
 
 /* ─────────── Config ─────────── */
@@ -165,6 +178,10 @@ export default function AdminPage() {
 
   // ── Verificação Cora ──
   const [verificandoCora, setVerificandoCora] = useState<string | null>(null);
+
+  // ── Parcelas de boleto ──
+  const [confirmandoParcela, setConfirmandoParcela] = useState<string | null>(null); // parcelaId em confirmação
+  const [dataParcelaInput, setDataParcelaInput]     = useState<Record<string, string>>({}); // parcelaId → date string
 
   // ── Exclusão de pedido ──
   const [confirmacaoApagar, setConfirmacaoApagar] = useState("");
@@ -294,6 +311,44 @@ export default function AdminPage() {
       setNovoAndDesc("");
     } finally {
       setSalvandoAnd(false);
+    }
+  };
+
+  const confirmarParcelaPaga = async (parcela: ParcelaBoleto, pago: boolean) => {
+    setConfirmandoParcela(parcela.id);
+    const pagoEm = pago
+      ? (dataParcelaInput[parcela.id] ? new Date(dataParcelaInput[parcela.id] + "T12:00:00").toISOString() : new Date().toISOString())
+      : null;
+    try {
+      const res  = await fetch(`/api/parcelas/${parcela.id}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ pagoEm }),
+      });
+      const data = await res.json();
+      if (res.ok && pedidoSelecionado) {
+        // Atualiza a parcela localmente
+        setPedidoSelecionado((prev) => {
+          if (!prev) return prev;
+          const novasParcelas = (prev.parcelasBoleto ?? []).map((p) =>
+            p.id === parcela.id ? { ...p, pagoEm: data.pagoEm } : p
+          );
+          // Recalcula valorPago: entrada + parcelas pagas
+          const entrada     = prev.valorEntrada ?? 0;
+          const parcelasPagas = novasParcelas.filter((p) => p.pagoEm).reduce((s, p) => s + p.valor, 0);
+          return { ...prev, parcelasBoleto: novasParcelas, valorPago: entrada + parcelasPagas };
+        });
+        // Atualiza na lista também
+        setPedidos((list) => list.map((p) =>
+          p.id === pedidoSelecionado.id
+            ? { ...p, valorPago: (p.valorEntrada ?? 0) + (pedidoSelecionado.parcelasBoleto ?? [])
+                .map((pb) => pb.id === parcela.id ? { ...pb, pagoEm: data.pagoEm } : pb)
+                .filter((pb) => pb.pagoEm).reduce((s, pb) => s + pb.valor, 0) }
+            : p
+        ));
+      }
+    } finally {
+      setConfirmandoParcela(null);
     }
   };
 
@@ -991,6 +1046,113 @@ export default function AdminPage() {
                   )}
                 </div>
               </section>
+
+              {/* ── Parcelas de Boleto ── */}
+              {pedidoSelecionado.modalidade === "boleto_parcelado" && (
+                <section>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <Banknote className="w-3.5 h-3.5" />
+                    Parcelas do Boleto
+                  </h4>
+
+                  {(pedidoSelecionado.parcelasBoleto ?? []).length === 0 ? (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700">
+                      As parcelas serão geradas automaticamente após a assinatura do contrato.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {(pedidoSelecionado.parcelasBoleto ?? []).map((parcela) => {
+                        const venc   = new Date(parcela.vencimento);
+                        const hoje   = new Date();
+                        const vencida = !parcela.pagoEm && venc < hoje;
+                        const diasLabel = parcela.numero === 1 ? "30 dias" : "60 dias";
+
+                        return (
+                          <div
+                            key={parcela.id}
+                            className={`rounded-xl border p-4 ${
+                              parcela.pagoEm
+                                ? "bg-emerald-50 border-emerald-200"
+                                : vencida
+                                ? "bg-red-50 border-red-200"
+                                : "bg-gray-50 border-gray-200"
+                            }`}
+                          >
+                            {/* Cabeçalho */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-navy-800">
+                                  Parcela {parcela.numero} ({diasLabel})
+                                </span>
+                                <span className="text-sm font-semibold text-navy-800">
+                                  {formatCurrency(parcela.valor)}
+                                </span>
+                              </div>
+                              {parcela.pagoEm ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                  <CheckCircle2 className="w-3 h-3" />Pago
+                                </span>
+                              ) : vencida ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                                  <AlertCircle className="w-3 h-3" />Vencida
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                  <Clock className="w-3 h-3" />Pendente
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Datas */}
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                              <Calendar className="w-3 h-3" />
+                              <span>Vencimento: <strong>{venc.toLocaleDateString("pt-BR")}</strong></span>
+                              {parcela.pagoEm && (
+                                <span className="text-emerald-700 ml-2">
+                                  · Pago em: <strong>{new Date(parcela.pagoEm).toLocaleDateString("pt-BR")}</strong>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Ações */}
+                            {parcela.pagoEm ? (
+                              <button
+                                onClick={() => confirmarParcelaPaga(parcela, false)}
+                                disabled={confirmandoParcela === parcela.id}
+                                className="text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                              >
+                                {confirmandoParcela === parcela.id ? "Desfazendo…" : "Desfazer pagamento"}
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                  <input
+                                    type="date"
+                                    value={dataParcelaInput[parcela.id] ?? new Date().toISOString().slice(0, 10)}
+                                    onChange={(e) =>
+                                      setDataParcelaInput((prev) => ({ ...prev, [parcela.id]: e.target.value }))
+                                    }
+                                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-navy-600"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => confirmarParcelaPaga(parcela, true)}
+                                  disabled={confirmandoParcela === parcela.id}
+                                  className="inline-flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {confirmandoParcela === parcela.id ? "Salvando…" : "Confirmar pago"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* Status */}
               <section>

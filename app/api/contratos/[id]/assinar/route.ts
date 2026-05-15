@@ -138,6 +138,32 @@ export async function POST(
       });
     }
 
+    // ── Auto-gera parcelas de boleto (30 e 60 dias) se modalidade for boleto_parcelado ──
+    if (contrato.pedido.modalidade === "boleto_parcelado") {
+      const jaExistem = await prisma.parcelaBoleto.count({ where: { pedidoId: contrato.pedidoId } });
+      if (jaExistem === 0) {
+        // Valor restante após entrada (dividido em 2 parcelas iguais)
+        const valorTotal  = contrato.pedido.valorTotal;
+        const entrada     = (contrato.pedido as Record<string, unknown>).valorEntrada as number ?? 0;
+        const restante    = valorTotal - entrada;
+        const valorParcela = restante / 2;
+
+        const venc30 = new Date(assinadoEm);
+        venc30.setDate(venc30.getDate() + 30);
+
+        const venc60 = new Date(assinadoEm);
+        venc60.setDate(venc60.getDate() + 60);
+
+        await prisma.parcelaBoleto.createMany({
+          data: [
+            { pedidoId: contrato.pedidoId, numero: 1, valor: valorParcela, vencimento: venc30 },
+            { pedidoId: contrato.pedidoId, numero: 2, valor: valorParcela, vencimento: venc60 },
+          ],
+        });
+        console.log(`[Contrato ${contrato.pedido.codigo}] Parcelas de boleto geradas: 2× R$${valorParcela.toFixed(2)}`);
+      }
+    }
+
     // Envia e-mail de confirmação de assinatura ao cliente
     if (contrato.pedido.cliente.email) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://expertsolucoes.com.br";

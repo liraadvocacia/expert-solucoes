@@ -53,9 +53,10 @@ model Pedido {
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id])
 
-  itens     ItemPedido[]
-  contrato  Contrato?
-  andamentos Andamento[]
+  itens          ItemPedido[]
+  contrato       Contrato?
+  andamentos     Andamento[]
+  parcelasBoleto ParcelaBoleto[]
 }
 
 model ItemPedido {
@@ -98,4 +99,17 @@ model Andamento {
 
   pedidoId  String
   pedido    Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+model ParcelaBoleto {
+  id         String    @id @default(cuid())
+  numero     Int       // 1 = 30 dias, 2 = 60 dias
+  valor      Float
+  vencimento DateTime  // data de vencimento calculada a partir da assinatura
+  pagoEm     DateTime? // null = pendente; preenchido ao confirmar pagamento
+  observacao String?
+  createdAt  DateTime  @default(now())
+
+  pedidoId   String
+  pedido     Pedido @relation(fields: [pedidoId], references: [id])
 }

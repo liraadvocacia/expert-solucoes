@@ -10,7 +10,13 @@ export async function GET(
   const { id } = await params;
   const pedido = await prisma.pedido.findUnique({
     where: { id },
-    include: { cliente: true, itens: true, contrato: true, andamentos: { orderBy: { createdAt: "asc" } } },
+    include: {
+      cliente:        true,
+      itens:          true,
+      contrato:       true,
+      andamentos:     { orderBy: { createdAt: "asc" } },
+      parcelasBoleto: { orderBy: { numero: "asc" } },
+    },
   });
 
   if (!pedido) {
@@ -35,7 +41,13 @@ export async function GET(
             valorPago: novoValorPago,
             status: novoPagoTotal ? "em_andamento" : "aguardando_pagamento",
           },
-          include: { cliente: true, itens: true, contrato: true, andamentos: { orderBy: { createdAt: "asc" } } },
+          include: {
+            cliente:        true,
+            itens:          true,
+            contrato:       true,
+            andamentos:     { orderBy: { createdAt: "asc" } },
+            parcelasBoleto: { orderBy: { numero: "asc" } },
+          },
         });
 
         if (novoPagoTotal && pedido.cliente.email) {
