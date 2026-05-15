@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Copy, Check, RefreshCw, QrCode, Clock, CheckCircle2,
-  AlertCircle, ArrowLeft, Smartphone, CreditCard, FileText,
-  ExternalLink, Loader2, FileSignature, Lock,
+  AlertCircle, ArrowLeft, Smartphone, FileText,
+  ExternalLink, Loader2, FileSignature, Lock, MessageCircle,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ type PagamentoState =
   | { fase: "pix"; emv: string; qrUrl: string | null; valor: number }
   | { fase: "boleto"; boletoUrl: string | null; valor: number }
   | { fase: "boleto_pix"; emv: string; qrUrl: string | null; boletoUrl: string | null; valor: number }
-  | { fase: "cartao"; checkoutUrl: string | null; valor: number; parcelas: number }
+  | { fase: "aguardando_cartao"; valor: number; parcelas: number }
   | { fase: "pago" };
 
 // ─── Componente interno (usa useSearchParams) ─────────────────────────────────
@@ -135,7 +135,7 @@ function PagamentoContent() {
     } catch { setState({ fase: "erro", mensagem: "Erro de conexão." }); }
   }, [pedidoId]);
 
-  // ── Gerar Cartão ──────────────────────────────────────────────────────────
+  // ── Gerar Cartão — registra intenção e exibe mensagem de contato WhatsApp ──
 
   const gerarCartao = useCallback(async () => {
     if (!pedidoId) { setState({ fase: "erro", mensagem: "pedidoId ausente." }); return; }
@@ -147,8 +147,8 @@ function PagamentoContent() {
         body: JSON.stringify({ pedidoId }),
       });
       const data = await res.json();
-      if (!res.ok) { setState({ fase: "erro", mensagem: data.error ?? "Erro ao gerar cobrança." }); return; }
-      setState({ fase: "cartao", checkoutUrl: data.checkoutUrl, valor: data.valor, parcelas: data.parcelas ?? 1 });
+      if (!res.ok) { setState({ fase: "erro", mensagem: data.error ?? "Erro ao registrar pedido." }); return; }
+      setState({ fase: "aguardando_cartao", valor: data.valor, parcelas: data.parcelas ?? 1 });
     } catch { setState({ fase: "erro", mensagem: "Erro de conexão." }); }
   }, [pedidoId]);
 
@@ -533,8 +533,8 @@ function PagamentoContent() {
           </div>
         )}
 
-        {/* ─── Cartão ─────────────────────────────────────────────────────── */}
-        {state.fase === "cartao" && (
+        {/* ─── Aguardando contato por cartão ──────────────────────────────── */}
+        {state.fase === "aguardando_cartao" && (
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
               <p className="text-xs text-gray-500 mb-1">Valor total</p>
@@ -546,45 +546,38 @@ function PagamentoContent() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <CreditCard className="w-4 h-4 text-navy-800" />
-                <h3 className="font-semibold text-navy-800 text-sm">Cartão de Crédito</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-emerald-600" />
               </div>
-              <p className="text-sm text-gray-500 mb-6">
-                Você será redirecionado para o ambiente seguro de pagamento da Cora para inserir os dados do cartão.
+              <h3 className="font-semibold text-navy-800 text-base mb-2">Pedido registrado!</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Nossa equipe vai entrar em contato via{" "}
+                <strong className="text-emerald-700">WhatsApp</strong> para enviar o
+                link de pagamento por cartão de crédito.
               </p>
-              {state.checkoutUrl ? (
-                <a
-                  href={state.checkoutUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-400 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Pagar com cartão
-                </a>
-              ) : (
-                <div className="text-center text-sm text-gray-400">Link de pagamento não disponível. Entre em contato.</div>
-              )}
             </div>
 
             <div className="bg-navy-800 rounded-2xl p-5 text-white">
-              <p className="text-xs font-semibold text-gold-400 mb-3 uppercase tracking-wide">Informações</p>
-              <ul className="flex flex-col gap-2 text-xs text-navy-100">
+              <p className="text-xs font-semibold text-gold-400 mb-3 uppercase tracking-wide">Próximos passos</p>
+              <ol className="flex flex-col gap-2.5 text-xs text-navy-100">
                 {[
-                  "Ambiente 100% seguro — criptografia SSL",
-                  "Aceitamos as principais bandeiras",
-                  "Parcelas sem acréscimo conforme condição contratada",
-                  "Confirmação imediata após o pagamento",
+                  "Seu pedido foi registrado com sucesso",
+                  "Em breve você receberá uma mensagem no WhatsApp",
+                  "O link de pagamento seguro será enviado pela nossa equipe",
+                  "Após o pagamento, você receberá a confirmação",
                 ].map((s, i) => (
                   <li key={i} className="flex items-start gap-2.5">
-                    <Check className="w-3.5 h-3.5 text-gold-400 shrink-0 mt-0.5" />
+                    <span className="w-5 h-5 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0 text-[10px] font-bold">{i + 1}</span>
                     {s}
                   </li>
                 ))}
-              </ul>
+              </ol>
             </div>
+
+            <p className="text-center text-xs text-gray-400">
+              Fique com o WhatsApp em mãos. Nossa equipe entrará em contato em breve.
+            </p>
           </div>
         )}
 
