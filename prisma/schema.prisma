@@ -53,10 +53,11 @@ model Pedido {
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id])
 
-  itens          ItemPedido[]
-  contrato       Contrato?
-  andamentos     Andamento[]
-  parcelasBoleto ParcelaBoleto[]
+  itens           ItemPedido[]
+  contrato        Contrato?
+  andamentos      Andamento[]
+  parcelasBoleto  ParcelaBoleto[]
+  relatorioRating RelatorioRating?
 }
 
 model ItemPedido {
@@ -112,4 +113,25 @@ model ParcelaBoleto {
 
   pedidoId   String
   pedido     Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+model RelatorioRating {
+  id               String   @id @default(cuid())
+  nomeCliente      String
+  cpf              String
+  classificacao    String
+  descricaoClasse  String
+  rendaPresumida   Float
+  comprometimento  Float
+  capacidadeMensal Float
+  pontualidade     Float?
+  pontualidadeMax  Float?
+  pendenciasJson   String   // JSON serializado de PendenciaRating[]
+  filePath         String
+  fileName         String
+  hash             String
+  createdAt        DateTime @default(now())
+
+  pedidoId String @unique
+  pedido   Pedido @relation(fields: [pedidoId], references: [id])
 }

@@ -31,6 +31,8 @@ import {
   Users,
   Calendar,
   Banknote,
+  Upload,
+  FileBarChart,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -82,6 +84,36 @@ interface Pedido {
   contrato: Contrato | null;
   andamentos?: Andamento[];
   parcelasBoleto?: ParcelaBoleto[];
+  relatorioRating?: {
+    id: string;
+    nomeCliente: string;
+    cpf: string;
+    classificacao: string;
+    descricaoClasse: string;
+    fileName: string;
+    createdAt: string;
+  } | null;
+}
+
+/* ─────────── Rating Types ─────────── */
+
+interface PendenciaForm {
+  tipo: string;
+  credor: string;
+  valor: string;
+  dataRef: string;
+}
+
+interface RatingFormData {
+  nomeCliente: string;
+  cpf: string;
+  classificacao: string;
+  descricaoClasse: string;
+  rendaPresumida: string;
+  comprometimento: string;
+  capacidadeMensal: string;
+  pontualidade: string;
+  pontualidadeMax: string;
 }
 
 /* ─────────── Config ─────────── */
@@ -188,6 +220,12 @@ export default function AdminPage() {
   const [apagarFase, setApagarFase]   = useState<"idle" | "confirmar" | "apagando">("idle");
   const [apagarErro, setApagarErro]   = useState("");
 
+  // ── Rating workflow ──
+  const [ratingFase, setRatingFase]             = useState<"idle"|"uploading"|"revisao"|"gerando"|"pronto">("idle");
+  const [ratingDados, setRatingDados]           = useState<Partial<RatingFormData> | null>(null);
+  const [ratingErro, setRatingErro]             = useState<string | null>(null);
+  const [ratingPendencias, setRatingPendencias] = useState<PendenciaForm[]>([]);
+
   // ── Andamentos ──
   const [novoAndTitulo, setNovoAndTitulo] = useState("");
   const [novoAndDesc, setNovoAndDesc] = useState("");
@@ -260,6 +298,10 @@ export default function AdminPage() {
     setApagarErro("");
     setEditandoValorPago(false);
     setNovoValorPagoInput("");
+    setRatingFase("idle");
+    setRatingDados(null);
+    setRatingErro(null);
+    setRatingPendencias([]);
   };
 
   const apagarPedido = async () => {
@@ -440,6 +482,80 @@ export default function AdminPage() {
     } finally {
       setSalvandoCliente(false);
     }
+  };
+
+  /* ── Rating ── */
+
+  const uploadPdfRating = async (file: File) => {
+    setRatingFase("uploading");
+    setRatingErro(null);
+    const fd = new FormData();
+    fd.append("pdf", file);
+    const res  = await fetch(`/api/pedidos/${pedidoSelecionado!.id}/rating/parse`, { method: "POST", body: fd });
+    const json = await res.json();
+    if (!res.ok) {
+      setRatingErro(json.error || "Erro ao processar PDF");
+      setRatingFase("idle");
+      return;
+    }
+    const d = json.dados;
+    setRatingDados({
+      nomeCliente:      d.nomeCliente     || pedidoSelecionado!.cliente.nome,
+      cpf:              d.cpf             || pedidoSelecionado!.cliente.cpf,
+      classificacao:    d.classificacao   || "",
+      descricaoClasse:  d.descricaoClasse || "",
+      rendaPresumida:   d.rendaPresumida?.toString()   || "0",
+      comprometimento:  d.comprometimento?.toString()  || "0",
+      capacidadeMensal: d.capacidadeMensal?.toString() || "0",
+      pontualidade:     d.pontualidade?.toString()     || "",
+      pontualidadeMax:  d.pontualidadeMax?.toString()  || "100",
+    });
+    setRatingPendencias(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (d.pendencias || []).map((p: any) => ({
+        tipo:    p.tipo,
+        credor:  p.credor,
+        valor:   p.valor?.toString() || "0",
+        dataRef: p.dataRef || "",
+      }))
+    );
+    setRatingFase("revisao");
+  };
+
+  const gerarRelatorio = async () => {
+    if (!ratingDados || !pedidoSelecionado) return;
+    setRatingFase("gerando");
+    setRatingErro(null);
+    const body = {
+      ...ratingDados,
+      rendaPresumida:   parseFloat(ratingDados.rendaPresumida   || "0"),
+      comprometimento:  parseFloat(ratingDados.comprometimento  || "0"),
+      capacidadeMensal: parseFloat(ratingDados.capacidadeMensal || "0"),
+      pontualidade:     ratingDados.pontualidade ? parseFloat(ratingDados.pontualidade) : undefined,
+      pontualidadeMax:  ratingDados.pontualidadeMax ? parseFloat(ratingDados.pontualidadeMax) : 100,
+      dataConsulta:     new Date().toISOString(),
+      pendencias: ratingPendencias.map(p => ({
+        tipo:    p.tipo,
+        credor:  p.credor,
+        valor:   parseFloat(p.valor) || 0,
+        dataRef: p.dataRef || undefined,
+      })),
+    };
+    const res  = await fetch(`/api/pedidos/${pedidoSelecionado.id}/rating/gerar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setRatingErro(json.error || "Erro ao gerar relatório");
+      setRatingFase("revisao");
+      return;
+    }
+    setPedidos(ps => ps.map(p => p.id === pedidoSelecionado.id
+      ? { ...p, relatorioRating: json.relatorio } : p));
+    setPedidoSelecionado(ps => ps ? { ...ps, relatorioRating: json.relatorio } : ps);
+    setRatingFase("pronto");
   };
 
   /* ── Derived ── */
@@ -1182,6 +1298,187 @@ export default function AdminPage() {
                       })}
                     </div>
                   )}
+                </section>
+              )}
+
+              {/* ── RELATÓRIO DE RATING ── */}
+              {pedidoSelecionado.itens.some(i => i.nome.toLowerCase().includes("rating")) && (
+                <section>
+                  <div className="border border-blue-100 rounded-xl overflow-hidden">
+                    {/* Header */}
+                    <div className="bg-blue-50 px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileBarChart className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-800">Relatório de Rating</span>
+                      </div>
+                      {pedidoSelecionado.relatorioRating && ratingFase === "idle" && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                          Gerado em {new Date(pedidoSelecionado.relatorioRating.createdAt).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-4 space-y-4">
+
+                      {/* IDLE / PRONTO: botão de upload ou download */}
+                      {(ratingFase === "idle" || ratingFase === "pronto") && (
+                        <div className="space-y-3">
+                          {pedidoSelecionado.relatorioRating && (
+                            <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-emerald-600" />
+                                <span className="text-sm text-emerald-800 font-medium">
+                                  {pedidoSelecionado.relatorioRating.fileName}
+                                </span>
+                              </div>
+                              <a
+                                href={`/api/relatorios/${pedidoSelecionado.relatorioRating.id}/download`}
+                                target="_blank"
+                                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                              >
+                                <Download className="w-3 h-3" /> Baixar PDF
+                              </a>
+                            </div>
+                          )}
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-2">
+                              {pedidoSelecionado.relatorioRating
+                                ? "Gerar novo relatório (substitui o atual):"
+                                : "Enviar PDF do portal parceiro (KSI):"}
+                            </label>
+                            <label className="cursor-pointer flex items-center gap-2 border-2 border-dashed border-blue-300 rounded-lg px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                              <Upload className="w-4 h-4 text-blue-500" />
+                              <span className="text-sm text-blue-600">Clique para selecionar o PDF da KSI</span>
+                              <input
+                                type="file" accept=".pdf" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadPdfRating(f); }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* UPLOADING */}
+                      {ratingFase === "uploading" && (
+                        <div className="flex items-center gap-3 py-4 justify-center">
+                          <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
+                          <span className="text-sm text-slate-600">Analisando PDF...</span>
+                        </div>
+                      )}
+
+                      {/* GERANDO */}
+                      {ratingFase === "gerando" && (
+                        <div className="flex items-center gap-3 py-4 justify-center">
+                          <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
+                          <span className="text-sm text-slate-600">Gerando relatório...</span>
+                        </div>
+                      )}
+
+                      {/* ERRO */}
+                      {ratingErro && (
+                        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                          {ratingErro}
+                        </div>
+                      )}
+
+                      {/* REVISÃO */}
+                      {ratingFase === "revisao" && ratingDados && (
+                        <div className="space-y-4">
+                          <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            Revise os dados extraídos do PDF antes de gerar o relatório.
+                          </p>
+
+                          {/* Grid de campos */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {([
+                              ["Nome do Analisado", "nomeCliente"],
+                              ["CPF", "cpf"],
+                              ["Classificação", "classificacao"],
+                              ["Descrição", "descricaoClasse"],
+                              ["Renda Presumida (R$)", "rendaPresumida"],
+                              ["Comprometimento (%)", "comprometimento"],
+                              ["Capacidade Mensal (R$)", "capacidadeMensal"],
+                              ["Pontualidade", "pontualidade"],
+                              ["Score Máximo", "pontualidadeMax"],
+                            ] as [string, keyof RatingFormData][]).map(([label, key]) => (
+                              <div key={key} className={key === "nomeCliente" ? "col-span-2" : ""}>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+                                {key === "classificacao" ? (
+                                  <select
+                                    value={ratingDados[key] || ""}
+                                    onChange={e => setRatingDados(d => ({ ...d, [key]: e.target.value }))}
+                                    className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                  >
+                                    <option value="">Selecione...</option>
+                                    {["C-","C","C+","B-","B","B+","A-","A","A+"].map(g => (
+                                      <option key={g} value={g}>{g}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={ratingDados[key] || ""}
+                                    onChange={e => setRatingDados(d => ({ ...d, [key]: e.target.value }))}
+                                    className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Pendências */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-slate-700">Restrições / Pendências</span>
+                              <button
+                                onClick={() => setRatingPendencias(ps => [...ps, { tipo: "", credor: "", valor: "", dataRef: "" }])}
+                                className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded-lg flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" /> Adicionar
+                              </button>
+                            </div>
+                            <div className="space-y-2">
+                              {ratingPendencias.map((p, i) => (
+                                <div key={i} className="grid grid-cols-12 gap-1 items-center bg-slate-50 rounded-lg p-2">
+                                  <input placeholder="Tipo" value={p.tipo}
+                                    onChange={e => setRatingPendencias(ps => ps.map((x, j) => j===i ? {...x, tipo: e.target.value} : x))}
+                                    className="col-span-2 text-xs border border-slate-200 rounded px-1.5 py-1 focus:outline-none" />
+                                  <input placeholder="Credor" value={p.credor}
+                                    onChange={e => setRatingPendencias(ps => ps.map((x, j) => j===i ? {...x, credor: e.target.value} : x))}
+                                    className="col-span-5 text-xs border border-slate-200 rounded px-1.5 py-1 focus:outline-none" />
+                                  <input placeholder="Valor" value={p.valor}
+                                    onChange={e => setRatingPendencias(ps => ps.map((x, j) => j===i ? {...x, valor: e.target.value} : x))}
+                                    className="col-span-2 text-xs border border-slate-200 rounded px-1.5 py-1 focus:outline-none" />
+                                  <input placeholder="Ref." value={p.dataRef}
+                                    onChange={e => setRatingPendencias(ps => ps.map((x, j) => j===i ? {...x, dataRef: e.target.value} : x))}
+                                    className="col-span-2 text-xs border border-slate-200 rounded px-1.5 py-1 focus:outline-none" />
+                                  <button onClick={() => setRatingPendencias(ps => ps.filter((_, j) => j !== i))}
+                                    className="col-span-1 text-red-400 hover:text-red-600 flex justify-center">
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              {ratingPendencias.length === 0 && (
+                                <p className="text-xs text-slate-400 text-center py-2">Nenhuma restrição identificada</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Botões */}
+                          <div className="flex gap-2 pt-2">
+                            <button onClick={() => setRatingFase("idle")}
+                              className="flex-1 text-sm border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg py-2 transition-colors">
+                              Cancelar
+                            </button>
+                            <button onClick={gerarRelatorio}
+                              className="flex-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 font-semibold transition-colors flex items-center justify-center gap-2">
+                              <FileBarChart className="w-4 h-4" /> Gerar Relatório
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </section>
               )}
 

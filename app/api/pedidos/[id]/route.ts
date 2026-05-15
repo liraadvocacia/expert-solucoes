@@ -16,6 +16,7 @@ export async function GET(
       contrato:       true,
       andamentos:     { orderBy: { createdAt: "asc" } },
       parcelasBoleto: { orderBy: { numero: "asc" } },
+      relatorioRating: true,
     },
   });
 
@@ -47,6 +48,7 @@ export async function GET(
             contrato:       true,
             andamentos:     { orderBy: { createdAt: "asc" } },
             parcelasBoleto: { orderBy: { numero: "asc" } },
+            relatorioRating: true,
           },
         });
 

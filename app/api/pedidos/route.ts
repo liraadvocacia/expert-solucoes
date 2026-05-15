@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const pedidos = await prisma.pedido.findMany({
     where,
-    include: { cliente: true, itens: true, contrato: true },
+    include: { cliente: true, itens: true, contrato: true, relatorioRating: true },
     orderBy: { createdAt: "desc" },
   });
 
