@@ -166,6 +166,11 @@ export default function AdminPage() {
   // ── Verificação Cora ──
   const [verificandoCora, setVerificandoCora] = useState<string | null>(null);
 
+  // ── Exclusão de pedido ──
+  const [confirmacaoApagar, setConfirmacaoApagar] = useState("");
+  const [apagarFase, setApagarFase]   = useState<"idle" | "confirmar" | "apagando">("idle");
+  const [apagarErro, setApagarErro]   = useState("");
+
   // ── Andamentos ──
   const [novoAndTitulo, setNovoAndTitulo] = useState("");
   const [novoAndDesc, setNovoAndDesc] = useState("");
@@ -228,6 +233,33 @@ export default function AdminPage() {
     setPedidoSelecionado(null);
     setNovoAndTitulo("");
     setNovoAndDesc("");
+    setApagarFase("idle");
+    setConfirmacaoApagar("");
+    setApagarErro("");
+  };
+
+  const apagarPedido = async () => {
+    if (!pedidoSelecionado) return;
+    if (confirmacaoApagar !== "APAGAR") {
+      setApagarErro("Digite exatamente APAGAR para confirmar.");
+      return;
+    }
+    setApagarFase("apagando");
+    setApagarErro("");
+    try {
+      const res = await fetch(`/api/pedidos/${pedidoSelecionado.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmacao: "APAGAR" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setApagarErro(data.error ?? "Erro ao apagar."); setApagarFase("confirmar"); return; }
+      fecharModal();
+      fetchPedidos();
+    } catch {
+      setApagarErro("Erro de conexão. Tente novamente.");
+      setApagarFase("confirmar");
+    }
   };
 
   const atualizarStatus = async (pedido: Pedido, novoStatus: Status, valorPago?: number) => {
@@ -1183,13 +1215,71 @@ export default function AdminPage() {
             </div>
 
             {/* Footer modal */}
-            <div className="sticky bottom-0 bg-white rounded-b-2xl border-t border-gray-100 px-6 py-4">
-              <button
-                onClick={fecharModal}
-                className="w-full border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Fechar
-              </button>
+            <div className="sticky bottom-0 bg-white rounded-b-2xl border-t border-gray-100 px-6 py-4 flex flex-col gap-3">
+
+              {/* Painel de confirmação de exclusão */}
+              {apagarFase === "confirmar" && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col gap-2">
+                  <p className="text-xs font-semibold text-red-700 flex items-center gap-1.5">
+                    <XCircle className="w-4 h-4" />
+                    Ação irreversível — o pedido será apagado permanentemente
+                  </p>
+                  <p className="text-xs text-red-600">
+                    Digite <strong>APAGAR</strong> abaixo para confirmar:
+                  </p>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={confirmacaoApagar}
+                    onChange={(e) => { setConfirmacaoApagar(e.target.value); setApagarErro(""); }}
+                    onKeyDown={(e) => e.key === "Enter" && apagarPedido()}
+                    placeholder="APAGAR"
+                    className="w-full border border-red-300 bg-white rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-red-500 placeholder:text-red-200"
+                  />
+                  {apagarErro && (
+                    <p className="text-xs text-red-600 font-medium">{apagarErro}</p>
+                  )}
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => { setApagarFase("idle"); setConfirmacaoApagar(""); setApagarErro(""); }}
+                      className="flex-1 text-xs border border-gray-200 text-gray-600 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={apagarPedido}
+                      disabled={confirmacaoApagar !== "APAGAR"}
+                      className="flex-1 text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-colors font-semibold"
+                    >
+                      Confirmar exclusão
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {apagarFase === "apagando" && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center text-xs text-red-600 font-medium">
+                  Apagando pedido…
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                {apagarFase === "idle" && (
+                  <button
+                    onClick={() => setApagarFase("confirmar")}
+                    className="flex items-center gap-1.5 text-xs border border-red-200 text-red-500 hover:bg-red-50 px-3 py-2.5 rounded-xl transition-colors font-medium"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Apagar pedido
+                  </button>
+                )}
+                <button
+                  onClick={fecharModal}
+                  className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>

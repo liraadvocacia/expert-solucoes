@@ -76,3 +76,30 @@ export async function PATCH(
 
   return NextResponse.json(pedido);
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  // Verifica palavra de confirmação enviada no body
+  const body = await req.json().catch(() => ({}));
+  if (body.confirmacao !== "APAGAR") {
+    return NextResponse.json({ error: "Confirmação inválida." }, { status: 400 });
+  }
+
+  const pedido = await prisma.pedido.findUnique({ where: { id } });
+  if (!pedido) {
+    return NextResponse.json({ error: "Pedido não encontrado." }, { status: 404 });
+  }
+
+  // Apaga dependentes antes do pedido (sem cascade no schema)
+  await prisma.andamento.deleteMany({ where: { pedidoId: id } });
+  await prisma.contrato.deleteMany({ where: { pedidoId: id } });
+  await prisma.itemPedido.deleteMany({ where: { pedidoId: id } });
+  await prisma.pedido.delete({ where: { id } });
+
+  console.log(`[Admin] Pedido ${pedido.codigo} excluído manualmente.`);
+  return NextResponse.json({ ok: true, codigo: pedido.codigo });
+}
