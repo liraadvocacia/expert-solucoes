@@ -44,9 +44,9 @@ const LIMPA_NOME_OPCOES: Record<ModalidadeLimpaNome, {
     valor: 600, entrada: 600, restante: 0, parcelas: 1, forma: "pix",
   },
   parcelado_cartao: {
-    label: "4× sem juros no cartão",
-    sublabel: "4× R$ 174,75 = R$ 699,00",
-    valor: 699, entrada: 0, restante: 699, parcelas: 4, forma: "cartao",
+    label: "5× sem juros no cartão",
+    sublabel: "5× R$ 139,80 = R$ 699,00",
+    valor: 699, entrada: 0, restante: 699, parcelas: 5, forma: "cartao",
   },
   boleto_parcelado: {
     label: "Entrada + boleto parcelado",
@@ -63,12 +63,12 @@ const RATING_FAIXAS: Record<FaixaRating, { label: string; sublabel: string; valo
 
 const RATING_PAGAMENTO: Record<ModalidadeRating, { label: string; sublabel: string }> = {
   entrada_50_50: { label: "50% entrada + 50% na conclusão", sublabel: "PIX ou boleto" },
-  "6x_cartao":   { label: "Parcelado em 6× no cartão",     sublabel: "Sem juros" },
+  "6x_cartao":   { label: "Parcelado em 5× no cartão",     sublabel: "Sem juros" },
 };
 
 const BACEN_PAGAMENTO: Record<ModalidadeBacen, { label: string; sublabel: string }> = {
   entrada_50_50: { label: "50% entrada + 50% na conclusão", sublabel: "PIX ou boleto" },
-  "6x_cartao":   { label: "Parcelado em 6× no cartão",     sublabel: "Sem juros" },
+  "6x_cartao":   { label: "Parcelado em 5× no cartão",     sublabel: "Sem juros" },
 };
 
 const BACEN_VALOR = 3000;
@@ -165,7 +165,7 @@ function computarPedido(
     const faixa = RATING_FAIXAS[faixaRating];
     const valor = faixa.valor;
     if (modalidadeRating === "6x_cartao") {
-      return { valor, entrada: 0, restante: valor, parcelas: 6, modalidade: "6x_cartao", forma: "cartao", faixaCredito: faixaRating, pronto: true };
+      return { valor, entrada: 0, restante: valor, parcelas: 5, modalidade: "6x_cartao", forma: "cartao", faixaCredito: faixaRating, pronto: true };
     }
     // 50/50 via PIX
     const entrada = valor / 2;
@@ -175,7 +175,7 @@ function computarPedido(
   if (servicoId === "bacen") {
     if (!modalidadeBacen) return null;
     if (modalidadeBacen === "6x_cartao") {
-      return { valor: BACEN_VALOR, entrada: 0, restante: BACEN_VALOR, parcelas: 6, modalidade: "6x_cartao", forma: "cartao", pronto: true };
+      return { valor: BACEN_VALOR, entrada: 0, restante: BACEN_VALOR, parcelas: 5, modalidade: "6x_cartao", forma: "cartao", pronto: true };
     }
     const entrada = BACEN_VALOR / 2;
     return { valor: BACEN_VALOR, entrada, restante: entrada, parcelas: 1, modalidade: "entrada_50_50", forma: "pix", pronto: true };
@@ -463,7 +463,7 @@ export default function ServicosPage() {
                                   {(Object.entries(RATING_PAGAMENTO) as [ModalidadeRating, typeof RATING_PAGAMENTO[ModalidadeRating]][]).map(([key, pag]) => {
                                     const valorBase = faixaRating ? RATING_FAIXAS[faixaRating].valor : 0;
                                     const desc = key === "6x_cartao" && valorBase
-                                      ? `6× ${formatCurrency(valorBase / 6)}`
+                                      ? `5× ${formatCurrency(valorBase / 5)}`
                                       : key === "entrada_50_50" && valorBase
                                       ? `Entrada ${formatCurrency(valorBase / 2)} + ${formatCurrency(valorBase / 2)} na conclusão`
                                       : pag.sublabel;
@@ -507,7 +507,7 @@ export default function ServicosPage() {
                               <div className="flex flex-col gap-2">
                                 {(Object.entries(BACEN_PAGAMENTO) as [ModalidadeBacen, typeof BACEN_PAGAMENTO[ModalidadeBacen]][]).map(([key, pag]) => {
                                   const desc = key === "6x_cartao"
-                                    ? `6× ${formatCurrency(BACEN_VALOR / 6)}`
+                                    ? `5× ${formatCurrency(BACEN_VALOR / 5)}`
                                     : `Entrada ${formatCurrency(BACEN_VALOR / 2)} + ${formatCurrency(BACEN_VALOR / 2)} na conclusão`;
                                   return (
                                     <button

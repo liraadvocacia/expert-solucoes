@@ -265,14 +265,12 @@ export default function AdminPage() {
     setPedidoCriado(null);
 
     const modalidade =
-      form.formaPagamento === "pix"      ? "avista_pix" :
-      form.formaPagamento === "boleto"   ? "boleto_parcelado" :
-      form.formaPagamento === "cartao6x" ? "6x_cartao" :
-      "parcelado_cartao";  // cartao4x ou qualquer outro
+      form.formaPagamento === "pix"    ? "avista_pix" :
+      form.formaPagamento === "boleto" ? "boleto_parcelado" :
+      "parcelado_cartao";  // cartao
 
     const parcelas =
-      form.formaPagamento === "cartao4x" ? 4 :
-      form.formaPagamento === "cartao6x" ? 6 :
+      form.formaPagamento === "cartao" ? 5 :
       undefined;
 
     try {
@@ -729,10 +727,9 @@ export default function AdminPage() {
                   </h3>
                   <div className="flex gap-3 flex-wrap">
                     {[
-                      { val: "pix",      label: "PIX"         },
-                      { val: "boleto",   label: "Boleto"      },
-                      { val: "cartao4x", label: "Cartão 4×"   },
-                      { val: "cartao6x", label: "Cartão 6×"   },
+                      { val: "pix",    label: "PIX"       },
+                      { val: "boleto", label: "Boleto"    },
+                      { val: "cartao", label: "Cartão 5×" },
                     ].map(({ val, label }) => (
                       <button
                         key={val}

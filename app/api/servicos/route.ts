@@ -77,8 +77,8 @@ export async function POST(req: NextRequest) {
       formaPagamento,
       modalidade: modalidade ?? null,
       parcelas: parcelas ?? (
-        modalidade === "parcelado_cartao" ? 4 :
-        modalidade === "6x_cartao"        ? 6 :
+        modalidade === "parcelado_cartao" ? 5 :
+        modalidade === "6x_cartao"        ? 5 :
         null
       ),
       valorEntrada: entradaFinal > 0 ? entradaFinal : null,
