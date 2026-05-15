@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle2, Clock, MessageCircle, Mail, FileText,
-  ArrowRight, Phone, Loader2, AlertCircle, Shield,
+  ArrowRight, Phone, Loader2, AlertCircle, Shield, Download,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -25,6 +25,7 @@ interface Pedido {
     whatsapp: string | null;
   };
   itens: { nome: string; valor: number }[];
+  contrato?: { id: string; status: string } | null;
 }
 
 // Prazo por tipo de serviço
@@ -209,6 +210,19 @@ function ConfirmacaoContent() {
               </p>
             </div>
           </div>
+        )}
+
+        {/* Download do contrato assinado — apenas para serviços */}
+        {!isConsulta && pedido?.contrato?.id && pedido.contrato.status === "assinado" && (
+          <a
+            href={`/api/contratos/${pedido.contrato.id}/documento?tipo=assinado`}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-medium py-3.5 rounded-2xl transition-colors text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Baixar contrato assinado
+          </a>
         )}
 
         {/* Segurança */}

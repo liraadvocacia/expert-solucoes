@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { criarCobrancaCartao } from "@/lib/cora";
+import { criarLinkPagamento } from "@/lib/infinitypay";
 
 /**
  * POST /api/pagamento/cartao
  * Body: { pedidoId: string }
  *
- * Cria uma cobrança de cartão de crédito na Cora para o pedido.
+ * Cria um link de pagamento no InfinityPay para o pedido.
  * Parcelas e valor vêm do próprio pedido (gravados no momento da criação).
- * Retorna a URL do checkout de cartão para redirect.
+ * Retorna a URL do checkout InfinityPay para redirect.
  */
 export async function POST(req: NextRequest) {
   const { pedidoId } = await req.json();
@@ -26,75 +26,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
   }
 
-  // Se já tem cobrança de cartão, retorna
-  if (pedido.cartaoCobrancaId && pedido.cartaoCheckoutUrl) {
+  // Se já tem link gerado, reutiliza sem recriar
+  if (pedido.cartaoCheckoutUrl) {
     return NextResponse.json({
-      cobrancaId: pedido.cartaoCobrancaId,
       checkoutUrl: pedido.cartaoCheckoutUrl,
-      valor: pedido.valorTotal,
+      valor:       pedido.valorTotal,
+      parcelas:    pedido.parcelas ?? 1,
     });
   }
 
-  // Vencimento em 3 dias
-  const vencimento = new Date();
-  vencimento.setDate(vencimento.getDate() + 3);
-  const vencimentoStr = vencimento.toISOString().split("T")[0];
-
-  const parcelas = pedido.parcelas ?? 1;
+  const parcelas    = pedido.parcelas ?? 1;
   const valorCobrar = pedido.valorTotal;
+  const baseUrl     = process.env.NEXT_PUBLIC_BASE_URL ?? "";
 
   try {
-    const cobranca = await criarCobrancaCartao({
-      codigo: pedido.codigo,
-      valorReais: valorCobrar,
-      vencimento: vencimentoStr,
+    const { checkoutUrl } = await criarLinkPagamento({
+      pedidoCodigo: pedido.codigo,
+      valorReais:   valorCobrar,
+      descricao:    pedido.itens[0]?.nome ?? "Serviço Expert Soluções",
       cliente: {
-        nome: pedido.cliente.nome,
-        cpf: pedido.cliente.cpf,
-        email: pedido.cliente.email,
+        nome:     pedido.cliente.nome,
+        email:    pedido.cliente.email,
+        telefone: pedido.cliente.whatsapp ?? pedido.cliente.telefone,
       },
-      servicos: [
-        {
-          nome: pedido.itens[0]?.nome ?? "Serviço",
-          valorReais: valorCobrar,
-        },
-      ],
-      parcelas,
+      // Após pagar, InfinityPay redireciona de volta para nossa página de pagamento
+      redirectUrl: `${baseUrl}/pagamento?pedidoId=${pedido.id}&codigo=${pedido.codigo}`,
+      webhookUrl:  `${baseUrl}/api/webhook/infinitypay`,
     });
 
-    // A Cora pode retornar o checkout URL em campos diferentes conforme versão da API
-    const checkoutUrl =
-      cobranca.checkout_url ??
-      cobranca.payment_options?.credit_card?.checkout_url ??
-      null;
-
+    // Persiste o link e marca como cartão
     await prisma.pedido.update({
       where: { id: pedidoId },
       data: {
-        cartaoCobrancaId: cobranca.id,
+        cartaoCobrancaId:  pedido.codigo, // order_nsu = codigo do pedido
         cartaoCheckoutUrl: checkoutUrl,
-        formaPagamento: "cartao",
+        formaPagamento:    "cartao",
       },
     });
 
     return NextResponse.json({
-      cobrancaId: cobranca.id,
       checkoutUrl,
-      valor: valorCobrar,
+      valor:    valorCobrar,
       parcelas,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[Cora Cartão] Erro ao criar cobrança:", msg);
+    console.error("[InfinityPay Cartão] Erro ao criar link:", msg);
 
-    // Mensagem amigável baseada no erro da Cora
-    let mensagem = "Erro ao gerar cobrança de cartão. Tente novamente.";
-    if (msg.includes("422") || msg.includes("payment_forms")) {
-      mensagem = "Pagamento por cartão não está habilitado nesta conta. Entre em contato pelo WhatsApp.";
+    let mensagem = "Erro ao gerar link de pagamento por cartão. Tente novamente.";
+    if (msg.includes("INFINITYPAY_HANDLE")) {
+      mensagem = "Gateway de cartão não configurado. Entre em contato pelo WhatsApp.";
     } else if (msg.includes("401") || msg.includes("403")) {
       mensagem = "Erro de autenticação com o gateway de pagamento. Entre em contato.";
     } else if (msg.includes("400")) {
-      mensagem = "Dados inválidos para cobrança de cartão. Verifique os dados e tente novamente.";
+      mensagem = "Dados inválidos para geração do link. Entre em contato.";
     }
 
     return NextResponse.json(

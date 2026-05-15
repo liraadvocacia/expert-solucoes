@@ -37,8 +37,9 @@ function PagamentoContent() {
   const tipoParam   = params.get("tipo");  // "consulta" | null
 
   const [state, setState]   = useState<PagamentoState>({ fase: "seletor" });
-  const [formaAtual, setFormaAtual] = useState<Forma | null>(formaParam);
+  const [formaAtual, setFormaAtual] = useState<Forma | null>(null);
   const [copiado, setCopiado]       = useState(false);
+  const [modalidade, setModalidade] = useState<string | null>(null);
 
   // ── Verificação de contrato não assinado ──────────────────────────────────
   const [contratoNaoAssinado, setContratoNaoAssinado] = useState<{
@@ -53,22 +54,22 @@ function PagamentoContent() {
     fetch(`/api/pedidos/${pedidoId}`)
       .then((r) => r.json())
       .then((pedido) => {
+        // Verifica contrato assinado
         const contrato = pedido?.contrato;
         if (contrato && contrato.status !== "assinado" && contrato.signingToken) {
           setContratoNaoAssinado({ signingToken: contrato.signingToken });
+        }
+        // Captura modalidade e dispara automaticamente para cartão
+        const mod: string | null = pedido?.modalidade ?? null;
+        setModalidade(mod);
+        if (mod === "parcelado_cartao" || mod === "6x_cartao") {
+          setFormaAtual("cartao");
         }
       })
       .catch(() => { /* continua normalmente se falhar */ })
       .finally(() => setVerificandoContrato(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidoId]);
-
-  // Se vier ?forma= na URL, carrega automaticamente sem mostrar seletor
-  useEffect(() => {
-    if (formaParam) {
-      setFormaAtual(formaParam);
-    }
-  }, [formaParam]);
 
   // ── Verificação de pagamento (poll) ────────────────────────────────────────
 
@@ -181,11 +182,13 @@ function PagamentoContent() {
 
   const tituloForma = (() => {
     if (!formaAtual) return "Pagamento";
-    if (formaAtual === "pix")    return "Pagamento via PIX";
-    if (formaAtual === "cartao") return "Pagamento via Cartão";
-    if (formaAtual === "boleto") return "Pagamento via Boleto";
+    if (formaAtual === "pix")        return "Pagamento via PIX";
+    if (formaAtual === "cartao")     return "Pagamento via Cartão";
+    if (formaAtual === "boleto_pix") return "Boleto + PIX";
+    if (formaAtual === "boleto")     return "Pagamento via Boleto";
     return "Pagamento";
   })();
+
 
   // ── Bloqueia pagamento se contrato ainda não foi assinado ────────────────
   if (verificandoContrato) {
@@ -242,9 +245,6 @@ function PagamentoContent() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <span className="text-white font-semibold text-sm">{tituloForma}</span>
-          {codigo && (
-            <span className="ml-auto font-mono text-xs text-navy-100/70">{codigo}</span>
-          )}
         </div>
       </div>
 
@@ -268,10 +268,8 @@ function PagamentoContent() {
             <p className="text-sm font-semibold text-gray-700 text-center">Escolha a forma de pagamento</p>
 
             {([
-              { forma: "pix" as Forma,        icon: QrCode,     label: "PIX",                   desc: "Aprovação instantânea" },
-              ...(tipoParam !== "consulta" ? [{ forma: "cartao" as Forma, icon: CreditCard, label: "Cartão de Crédito", desc: parcelasExibido && parcelasExibido > 1 ? `Em ${parcelasExibido}× sem juros` : "À vista ou parcelado" }] : []),
-              { forma: "boleto_pix" as Forma, icon: FileText,    label: "Boleto + PIX",          desc: "Pague pelo PIX ou pelo boleto bancário" },
-              { forma: "boleto" as Forma,     icon: FileText,    label: "Boleto Bancário",        desc: "Compensação em até 3 dias úteis" },
+              { forma: "pix" as Forma,        icon: QrCode,   label: "PIX",          desc: "Aprovação instantânea" },
+              { forma: "boleto_pix" as Forma, icon: FileText, label: "Boleto + PIX",  desc: "Pague pelo PIX ou pelo boleto bancário" },
             ] as { forma: Forma; icon: React.ElementType; label: string; desc: string }[]).map(({ forma, icon: Icon, label, desc }) => (
               <button
                 key={forma}

@@ -76,7 +76,11 @@ export async function POST(req: NextRequest) {
       valorTotal: valor,
       formaPagamento,
       modalidade: modalidade ?? null,
-      parcelas: parcelas ?? null,
+      parcelas: parcelas ?? (
+        modalidade === "parcelado_cartao" ? 4 :
+        modalidade === "6x_cartao"        ? 6 :
+        null
+      ),
       valorEntrada: entradaFinal > 0 ? entradaFinal : null,
       faixaCredito: faixaCredito ?? null,
       clienteId: cliente.id,

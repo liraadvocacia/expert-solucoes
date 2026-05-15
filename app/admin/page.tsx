@@ -265,9 +265,15 @@ export default function AdminPage() {
     setPedidoCriado(null);
 
     const modalidade =
-      form.formaPagamento === "pix"    ? "avista_pix" :
-      form.formaPagamento === "boleto" ? "boleto_parcelado" :
-      "parcelado_cartao";
+      form.formaPagamento === "pix"      ? "avista_pix" :
+      form.formaPagamento === "boleto"   ? "boleto_parcelado" :
+      form.formaPagamento === "cartao6x" ? "6x_cartao" :
+      "parcelado_cartao";  // cartao4x ou qualquer outro
+
+    const parcelas =
+      form.formaPagamento === "cartao4x" ? 4 :
+      form.formaPagamento === "cartao6x" ? 6 :
+      undefined;
 
     try {
       const res = await fetch("/api/servicos", {
@@ -284,6 +290,7 @@ export default function AdminPage() {
           valor:       parseFloat(form.valor.replace(",", ".")),
           entrada:     0,
           modalidade,
+          parcelas,
           faixaCredito: form.servico === "Rating Bancário" ? form.faixaCredito : undefined,
         }),
       });
@@ -722,9 +729,10 @@ export default function AdminPage() {
                   </h3>
                   <div className="flex gap-3 flex-wrap">
                     {[
-                      { val: "pix",    label: "PIX"    },
-                      { val: "boleto", label: "Boleto" },
-                      { val: "cartao", label: "Cartão" },
+                      { val: "pix",      label: "PIX"         },
+                      { val: "boleto",   label: "Boleto"      },
+                      { val: "cartao4x", label: "Cartão 4×"   },
+                      { val: "cartao6x", label: "Cartão 6×"   },
                     ].map(({ val, label }) => (
                       <button
                         key={val}

@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
-  Download,
   Shield,
   Lock,
   ChevronDown,
@@ -166,12 +165,12 @@ export default function AssinarPage({ params }: { params: Promise<{ token: strin
     const pagamentoUrl = (() => {
       if (!contrato) return null;
       const p = contrato.pedido;
-      const forma = p.formaPagamento ?? "pix";
       const valor = p.valorEntrada ?? p.valorTotal;
+      // Não passa "forma" — a página de pagamento determina as opções
+      // automaticamente com base na modalidade do pedido.
       const params = new URLSearchParams({
         pedidoId: p.id,
         codigo: p.codigo,
-        forma,
         valor: String(valor),
       });
       return `/pagamento?${params.toString()}`;
@@ -184,14 +183,9 @@ export default function AssinarPage({ params }: { params: Promise<{ token: strin
             <CheckCircle2 className="w-8 h-8 text-emerald-600" />
           </div>
           <h2 className="text-2xl font-bold text-navy-800 mb-2">Assinado com sucesso!</h2>
-          <p className="text-sm text-gray-500 mb-1">
+          <p className="text-sm text-gray-500 mb-4">
             Assinado em: <span className="font-medium text-navy-800">{assinadoEm} (BRT)</span>
           </p>
-          {contrato && (
-            <p className="text-sm text-gray-500 mb-4">
-              Pedido: <span className="font-mono font-medium text-navy-800">{contrato.pedido.codigo}</span>
-            </p>
-          )}
           <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left text-sm">
             <div className="flex items-start gap-2 text-gray-600">
               <Shield className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -207,17 +201,6 @@ export default function AssinarPage({ params }: { params: Promise<{ token: strin
                 Prosseguir para pagamento
               </a>
             )}
-            {contrato && (
-              <a
-                href={`/api/contratos/${contrato.id}/documento?tipo=assinado`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
-              >
-                <Download className="w-4 h-4" />
-                Baixar contrato assinado
-              </a>
-            )}
           </div>
         </div>
       </div>
@@ -230,14 +213,9 @@ export default function AssinarPage({ params }: { params: Promise<{ token: strin
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-navy-800 px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-gold-400" />
-            <span className="text-white font-bold text-sm">Expert Soluções — Assinatura Digital</span>
-          </div>
-          {contrato && (
-            <span className="font-mono text-xs text-navy-100/70">{contrato.pedido.codigo}</span>
-          )}
+        <div className="max-w-2xl mx-auto flex items-center gap-2">
+          <Lock className="w-4 h-4 text-gold-400" />
+          <span className="text-white font-bold text-sm">Expert Soluções — Assinatura Digital</span>
         </div>
       </div>
 
