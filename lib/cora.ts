@@ -197,6 +197,21 @@ export async function criarCobrancaBoleto(params: CreateChargeParams): Promise<C
 }
 
 /**
+ * Cria uma cobrança combinada Boleto + PIX na Cora.
+ * O cliente pode pagar via PIX (instantâneo) ou via boleto (até 3 dias).
+ * Retorna a URL do boleto em `payment_options.bank_slip.url`
+ * e o código PIX Copia e Cola em `pix.emv`.
+ */
+export async function criarCobrancaBoletoComPix(params: CreateChargeParams): Promise<CoraCharge> {
+  const body = buildInvoiceBody(params, ["BANK_SLIP", "PIX"]);
+  return await coraFetch("/v2/invoices/", {
+    method: "POST",
+    body: JSON.stringify(body),
+    idempotencyKey: crypto.randomUUID(),
+  }) as CoraCharge;
+}
+
+/**
  * Cria uma cobrança de cartão de crédito na Cora (parcelado ou à vista).
  * Retorna a URL do checkout de cartão em `checkout_url` ou `payment_options.credit_card.checkout_url`.
  */

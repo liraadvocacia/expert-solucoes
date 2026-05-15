@@ -12,7 +12,7 @@ import { formatCurrency } from "@/lib/utils";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type Forma = "pix" | "cartao" | "boleto";
+type Forma = "pix" | "cartao" | "boleto" | "boleto_pix";
 
 type PagamentoState =
   | { fase: "seletor" }
@@ -20,6 +20,7 @@ type PagamentoState =
   | { fase: "erro"; mensagem: string }
   | { fase: "pix"; emv: string; qrUrl: string | null; valor: number }
   | { fase: "boleto"; boletoUrl: string | null; valor: number }
+  | { fase: "boleto_pix"; emv: string; qrUrl: string | null; boletoUrl: string | null; valor: number }
   | { fase: "cartao"; checkoutUrl: string | null; valor: number; parcelas: number }
   | { fase: "pago" };
 
@@ -116,6 +117,23 @@ function PagamentoContent() {
     } catch { setState({ fase: "erro", mensagem: "Erro de conexão." }); }
   }, [pedidoId]);
 
+  // ── Gerar Boleto + PIX ────────────────────────────────────────────────────
+
+  const gerarBoletoComPix = useCallback(async () => {
+    if (!pedidoId) { setState({ fase: "erro", mensagem: "pedidoId ausente." }); return; }
+    setState({ fase: "carregando" });
+    try {
+      const res  = await fetch("/api/pagamento/boleto-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedidoId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setState({ fase: "erro", mensagem: data.error ?? "Erro ao gerar cobrança." }); return; }
+      setState({ fase: "boleto_pix", emv: data.emv ?? "", qrUrl: data.qrUrl, boletoUrl: data.boletoUrl, valor: data.valor });
+    } catch { setState({ fase: "erro", mensagem: "Erro de conexão." }); }
+  }, [pedidoId]);
+
   // ── Gerar Cartão ──────────────────────────────────────────────────────────
 
   const gerarCartao = useCallback(async () => {
@@ -136,14 +154,15 @@ function PagamentoContent() {
   // Dispara cobrança quando forma é selecionada
   useEffect(() => {
     if (!formaAtual) return;
-    if (formaAtual === "pix")    gerarPix();
-    if (formaAtual === "boleto") gerarBoleto();
-    if (formaAtual === "cartao") gerarCartao();
-  }, [formaAtual, gerarPix, gerarBoleto, gerarCartao]);
+    if (formaAtual === "pix")        gerarPix();
+    if (formaAtual === "boleto")     gerarBoleto();
+    if (formaAtual === "boleto_pix") gerarBoletoComPix();
+    if (formaAtual === "cartao")     gerarCartao();
+  }, [formaAtual, gerarPix, gerarBoleto, gerarBoletoComPix, gerarCartao]);
 
-  // Poll a cada 10s
+  // Poll a cada 10s (PIX, Boleto e Boleto+PIX)
   useEffect(() => {
-    if (state.fase !== "pix" && state.fase !== "boleto") return;
+    if (state.fase !== "pix" && state.fase !== "boleto" && state.fase !== "boleto_pix") return;
     const interval = setInterval(verificarPagamento, 10_000);
     return () => clearInterval(interval);
   }, [state.fase, verificarPagamento]);
@@ -249,9 +268,10 @@ function PagamentoContent() {
             <p className="text-sm font-semibold text-gray-700 text-center">Escolha a forma de pagamento</p>
 
             {([
-              { forma: "pix" as Forma,    icon: QrCode,     label: "PIX",                desc: "Aprovação instantânea" },
+              { forma: "pix" as Forma,        icon: QrCode,     label: "PIX",                   desc: "Aprovação instantânea" },
               ...(tipoParam !== "consulta" ? [{ forma: "cartao" as Forma, icon: CreditCard, label: "Cartão de Crédito", desc: parcelasExibido && parcelasExibido > 1 ? `Em ${parcelasExibido}× sem juros` : "À vista ou parcelado" }] : []),
-              { forma: "boleto" as Forma, icon: FileText,    label: "Boleto Bancário",    desc: "Compensação em até 3 dias úteis" },
+              { forma: "boleto_pix" as Forma, icon: FileText,    label: "Boleto + PIX",          desc: "Pague pelo PIX ou pelo boleto bancário" },
+              { forma: "boleto" as Forma,     icon: FileText,    label: "Boleto Bancário",        desc: "Compensação em até 3 dias úteis" },
             ] as { forma: Forma; icon: React.ElementType; label: string; desc: string }[]).map(({ forma, icon: Icon, label, desc }) => (
               <button
                 key={forma}
@@ -420,6 +440,98 @@ function PagamentoContent() {
             </div>
 
             <p className="text-center text-xs text-gray-400">Esta página atualiza automaticamente após a confirmação do pagamento.</p>
+          </div>
+        )}
+
+        {/* ─── Boleto + PIX ───────────────────────────────────────────────── */}
+        {state.fase === "boleto_pix" && (
+          <div className="flex flex-col gap-4">
+            {/* Valor */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
+              <p className="text-xs text-gray-500 mb-1">Valor a pagar</p>
+              <p className="text-4xl font-bold text-navy-800">{formatCurrency(state.valor)}</p>
+              <div className="flex items-center justify-center gap-1.5 mt-2 text-xs text-amber-600">
+                <Clock className="w-3.5 h-3.5" />
+                Válido por 3 dias
+              </div>
+            </div>
+
+            {/* PIX */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <QrCode className="w-4 h-4 text-navy-800" />
+                <h3 className="font-semibold text-navy-800 text-sm">Pagar com PIX</h3>
+                <span className="ml-auto text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Instantâneo</span>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">Aprovação imediata após o pagamento</p>
+
+              {state.qrUrl ? (
+                <div className="flex justify-center mb-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={state.qrUrl} alt="QR Code PIX" className="w-44 h-44 rounded-xl border border-gray-100" />
+                </div>
+              ) : (
+                <div className="w-44 h-44 mx-auto mb-4 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <QrCode className="w-10 h-10 text-gray-300" />
+                </div>
+              )}
+
+              {state.emv && (
+                <>
+                  <div className="bg-gray-50 rounded-xl p-3 mb-3 text-xs font-mono text-gray-600 break-all leading-relaxed max-h-20 overflow-y-auto">
+                    {state.emv}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(state.fase === "boleto_pix" ? state.emv : "");
+                      setCopiado(true);
+                      setTimeout(() => setCopiado(false), 3000);
+                    }}
+                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+                      copiado ? "bg-emerald-500 text-white" : "bg-navy-800 hover:bg-navy-700 text-white"
+                    }`}
+                  >
+                    {copiado
+                      ? <><Check className="w-4 h-4" />Código copiado!</>
+                      : <><Copy className="w-4 h-4" />Copiar código PIX</>
+                    }
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Separador */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 font-medium">ou pague pelo boleto</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            {/* Boleto */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="w-4 h-4 text-navy-800" />
+                <h3 className="font-semibold text-navy-800 text-sm">Boleto Bancário</h3>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">Pague em qualquer banco, lotérica ou app — compensação em até 3 dias úteis</p>
+              {state.boletoUrl ? (
+                <a
+                  href={state.boletoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Abrir boleto
+                </a>
+              ) : (
+                <div className="text-center text-sm text-gray-400">URL do boleto não disponível. Entre em contato.</div>
+              )}
+            </div>
+
+            <p className="text-center text-xs text-gray-400">
+              Esta página atualiza automaticamente após o pagamento.
+            </p>
           </div>
         )}
 

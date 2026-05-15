@@ -19,9 +19,11 @@ export async function GET(
 
   // ── Fallback de polling: consulta a Cora diretamente se ainda aguardando ──
   // Garante que o pagamento seja detectado mesmo que o webhook não chegue.
-  if (pedido.status === "aguardando_pagamento" && pedido.pixCobrancaId) {
+  // Verifica pixCobrancaId (PIX puro) e boletoCobrancaId (Boleto+PIX ou boleto).
+  const cobrancaIdParaPolling = pedido.pixCobrancaId ?? pedido.boletoCobrancaId;
+  if (pedido.status === "aguardando_pagamento" && cobrancaIdParaPolling) {
     try {
-      const cobranca = await buscarCobranca(pedido.pixCobrancaId);
+      const cobranca = await buscarCobranca(cobrancaIdParaPolling);
       if (cobranca.status === "PAID") {
         const valorPago = (cobranca.total_amount ?? 0) / 100;
         const novoValorPago = pedido.valorPago + valorPago;
