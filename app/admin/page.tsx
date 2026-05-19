@@ -820,7 +820,19 @@ export default function AdminPage() {
                           <td className="px-5 py-3.5">
                             <div className="font-medium text-navy-800 text-sm">{p.cliente.nome}</div>
                             <div className="text-xs text-gray-500">{p.cliente.cpf}</div>
-                            <div className="text-xs text-gray-400">{p.cliente.telefone}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs text-gray-400">{p.cliente.telefone}</span>
+                              <a
+                                href={whatsappLink(p.cliente.telefone, `Olá, ${p.cliente.nome.split(" ")[0]}! 👋`)}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                title="Abrir WhatsApp"
+                                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shrink-0"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                              </a>
+                            </div>
                           </td>
                           <td className="px-5 py-3.5">
                             <div className="text-navy-800 text-sm">{p.itens.map((i) => i.nome).join(", ")}</div>
