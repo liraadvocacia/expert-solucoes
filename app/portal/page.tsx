@@ -18,6 +18,7 @@ import {
   DollarSign,
   Package,
   LogOut,
+  CalendarClock,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -36,6 +37,13 @@ interface ContratoPortal {
   assinaturaPath: string | null;
 }
 
+interface LimpaNomeOrgaos {
+  serasa:    string;
+  spc:       string;
+  boaVista:  string;
+  protestos: string;
+}
+
 interface PedidoPortal {
   id: string;
   codigo: string;
@@ -44,11 +52,13 @@ interface PedidoPortal {
   valorTotal: number;
   valorPago: number;
   formaPagamento: string | null;
+  prazoFinal: string | null;
   createdAt: string;
   cliente: { nome: string; cpf: string; email: string | null; telefone: string | null };
   itens: { id: string; nome: string; valor: number }[];
   contrato: ContratoPortal | null;
   andamentos: Andamento[];
+  limpaNomeOrgaos: LimpaNomeOrgaos | null;
 }
 
 const statusConfig: Record<
@@ -258,6 +268,84 @@ export default function PortalPage() {
                 </div>
               </div>
             )}
+
+            {/* Prazo Final + Órgãos — Limpa Nome */}
+            {pedido.itens.some(i => i.nome.toLowerCase().includes("limpa nome")) && (() => {
+              const orgaos = pedido.limpaNomeOrgaos;
+              const cfgStatus: Record<string, { label: string; cor: string; bg: string; dot: string }> = {
+                pendente:     { label: "Pendente",     cor: "text-gray-500",    bg: "bg-gray-100",    dot: "bg-gray-400"   },
+                em_andamento: { label: "Em andamento", cor: "text-blue-700",    bg: "bg-blue-50",     dot: "bg-blue-500"   },
+                baixado:      { label: "Baixado ✓",    cor: "text-emerald-700", bg: "bg-emerald-50",  dot: "bg-emerald-500"},
+                sem_registro: { label: "Sem registro", cor: "text-slate-500",   bg: "bg-slate-100",   dot: "bg-slate-400"  },
+              };
+              const listaOrgaos = [
+                { key: "serasa",    label: "SERASA"    },
+                { key: "spc",       label: "SPC"       },
+                { key: "boaVista",  label: "BOA VISTA" },
+                { key: "protestos", label: "PROTESTOS" },
+              ] as const;
+
+              const diasRestantes = pedido.prazoFinal
+                ? Math.ceil((new Date(pedido.prazoFinal).getTime() - Date.now()) / 86400000)
+                : null;
+
+              return (
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-5">
+
+                  {/* Prazo */}
+                  {pedido.prazoFinal && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-navy-50 flex items-center justify-center shrink-0">
+                        <CalendarClock className="w-5 h-5 text-navy-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Prazo estimado de conclusão</p>
+                        <p className="text-sm font-bold text-navy-800">
+                          {new Date(pedido.prazoFinal).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                        </p>
+                      </div>
+                      {diasRestantes !== null && (
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full shrink-0 ${
+                          diasRestantes < 0
+                            ? "bg-red-50 text-red-600"
+                            : diasRestantes <= 10
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-emerald-50 text-emerald-700"
+                        }`}>
+                          {diasRestantes < 0
+                            ? "Em revisão"
+                            : diasRestantes === 0
+                              ? "Hoje"
+                              : `${diasRestantes} dias`}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Órgãos */}
+                  {orgaos && (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-3">Situação por órgão</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {listaOrgaos.map(({ key, label }) => {
+                          const s = (orgaos[key] || "pendente") as string;
+                          const cfg = cfgStatus[s] ?? cfgStatus.pendente;
+                          return (
+                            <div key={key} className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 ${cfg.bg}`}>
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                              <div>
+                                <p className="text-xs font-bold text-navy-800">{label}</p>
+                                <p className={`text-xs font-medium ${cfg.cor}`}>{cfg.label}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Serviço + Financeiro */}
             <div className="grid sm:grid-cols-2 gap-5">
