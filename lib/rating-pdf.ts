@@ -33,8 +33,8 @@ const H          = 841.89;
 const ML         = 52;
 const MR         = W - 52;
 const CW         = MR - ML;
-const BODY_SIZE  = 9.0;
-const LINE_H     = 14;
+const BODY_SIZE  = 10.5;
+const LINE_H     = 16;
 const FOOTER_H   = 32;
 const HEADER_H   = 76;
 
@@ -137,10 +137,10 @@ function drawFooter(page: PDFPage, reg: PDFFont, num: number, total: number) {
   hline(page, FOOTER_H, 0, W, 1.5, GOLD);
   t(page,
     "Expert Solucoes Financeiras  |  Documento Confidencial  |  www.expertsolucoes.com.br",
-    ML, 11, reg, 6.5, rgb(0.65, 0.78, 0.9));
+    ML, 11, reg, 7.5, rgb(0.65, 0.78, 0.9));
   const pg = `Pagina ${num} de ${total}`;
-  const pgW = reg.widthOfTextAtSize(san(pg), 6.5);
-  t(page, pg, MR - pgW, 11, reg, 6.5, rgb(0.65, 0.78, 0.9));
+  const pgW = reg.widthOfTextAtSize(san(pg), 7.5);
+  t(page, pg, MR - pgW, 11, reg, 7.5, rgb(0.65, 0.78, 0.9));
 }
 
 // ─── DocRenderer ──────────────────────────────────────────────────────────────
@@ -189,10 +189,10 @@ class DocRenderer {
   }
 
   subtitulo(text: string) {
-    this.ensure(16);
-    const tw = this.reg.widthOfTextAtSize(san(text), 8.5);
-    t(this.page, text, (W - tw) / 2, this.y, this.reg, 8.5, CINZA);
-    this.y -= 15;
+    this.ensure(18);
+    const tw = this.reg.widthOfTextAtSize(san(text), 10.0);
+    t(this.page, text, (W - tw) / 2, this.y, this.reg, 10.0, CINZA);
+    this.y -= 17;
   }
 
   goldLine() {
@@ -203,19 +203,19 @@ class DocRenderer {
 
   // ── Cabeçalho de seção ──────────────────────────────────────────────────
   secHeader(text: string) {
-    this.ensure(40);
+    this.ensure(44);
     this.y -= 10;
-    const boxH = 24;
+    const boxH = 27;
     this.page.drawRectangle({ x: ML, y: this.y - boxH, width: CW, height: boxH, color: BG_SEC });
     this.page.drawRectangle({ x: ML, y: this.y - boxH, width: 4,  height: boxH, color: GOLD });
-    const tw = this.bold.widthOfTextAtSize(san(text), 8.5);
-    t(this.page, text, (W - tw) / 2, this.y - 15, this.bold, 8.5, NAVY);
+    const tw = this.bold.widthOfTextAtSize(san(text), 10.0);
+    t(this.page, text, (W - tw) / 2, this.y - 17, this.bold, 10.0, NAVY);
     this.y -= boxH + 10;
   }
 
   // ── Caixa de dados simples ───────────────────────────────────────────────
   infoBox(rows: [string, string][]) {
-    const rowH = 19;
+    const rowH = 22;
     const boxH = rows.length * rowH + 16;
     this.ensure(boxH + 10);
     this.page.drawRectangle({
@@ -223,16 +223,16 @@ class DocRenderer {
       color: BG_BOX, borderColor: rgb(0.80, 0.84, 0.92), borderWidth: 0.8,
     });
     this.page.drawRectangle({ x: ML, y: this.y - boxH, width: 3.5, height: boxH, color: NAVY });
-    let iy = this.y - 13;
+    let iy = this.y - 14;
     for (const [label, value] of rows) {
-      t(this.page, label, ML + 12, iy, this.bold, 7.5, CINZA);
-      const lw = this.bold.widthOfTextAtSize(san(label) + "  ", 7.5);
+      t(this.page, label, ML + 12, iy, this.bold, 9.0, CINZA);
+      const lw = this.bold.widthOfTextAtSize(san(label) + "  ", 9.0);
       // truncar se necessário
       let val = san(value);
       const maxVW = CW - lw - 28;
-      while (this.reg.widthOfTextAtSize(val, 7.5) > maxVW && val.length > 4)
+      while (this.reg.widthOfTextAtSize(val, 9.0) > maxVW && val.length > 4)
         val = val.slice(0, -4) + "...";
-      t(this.page, val, ML + 12 + lw, iy, this.reg, 7.5, TEXTO);
+      t(this.page, val, ML + 12 + lw, iy, this.reg, 9.0, TEXTO);
       iy -= rowH;
     }
     this.y -= boxH + 10;
@@ -243,8 +243,8 @@ class DocRenderer {
     const LABEL_W  = 148;           // largura da coluna de label (navy)
     const VAL_X    = ML + LABEL_W;
     const VAL_W    = MR - VAL_X;
-    const VAL_SIZE = 10.5;
-    const LAB_SIZE = 7.8;
+    const VAL_SIZE = 12.0;
+    const LAB_SIZE = 9.0;
     const ROW_H    = 38;            // altura generosa por linha
     const boxH     = rows.length * ROW_H;
     this.ensure(boxH + 14);
@@ -411,13 +411,13 @@ class DocRenderer {
       start: { x: ML, y: axisY }, end: { x: MR, y: axisY },
       thickness: 0.6, color: CINZA_L,
     });
-    t(this.page, "REPROVADO", ML, axisY - 10, this.bold, 7.0, VERMELHO);
-    const apW = this.bold.widthOfTextAtSize("APROVADO", 7.0);
-    t(this.page, "APROVADO", MR - apW, axisY - 10, this.bold, 7.0, VERDE);
+    t(this.page, "REPROVADO", ML, axisY - 11, this.bold, 8.5, VERMELHO);
+    const apW = this.bold.widthOfTextAtSize("APROVADO", 8.5);
+    t(this.page, "APROVADO", MR - apW, axisY - 11, this.bold, 8.5, VERDE);
 
     // Triângulos indicadores nas pontas (simulados com traços)
     this.page.drawLine({
-      start: { x: ML + this.bold.widthOfTextAtSize("REPROVADO", 7.0) + 4, y: axisY },
+      start: { x: ML + this.bold.widthOfTextAtSize("REPROVADO", 8.5) + 4, y: axisY },
       end:   { x: aprovX - 4, y: axisY },
       thickness: 1.2, color: VERMELHO, opacity: 0.4,
     });
@@ -430,24 +430,24 @@ class DocRenderer {
     // ── Linha de resumo da classificação ─────────────────────────────────
     const corAtual  = gradeColor(classificacao);
     const resumo    = `Classificacao atual: ${classificacao}  -  ${descricao}`;
-    const resumoW   = this.bold.widthOfTextAtSize(san(resumo), 9.0);
-    t(this.page, resumo, (W - resumoW) / 2, axisY - 26,
-      this.bold, 9.0, corAtual);
+    const resumoW   = this.bold.widthOfTextAtSize(san(resumo), 10.5);
+    t(this.page, resumo, (W - resumoW) / 2, axisY - 28,
+      this.bold, 10.5, corAtual);
 
     this.y = axisY - 40;
   }
 
   // ── Tabela de pendências ─────────────────────────────────────────────────
   tabelaPendencias(headers: string[], rows: string[][], colWidths: number[]) {
-    const rowH   = 17;
-    const headH  = 22;
+    const rowH   = 20;
+    const headH  = 26;
     const totalH = headH + rows.length * rowH + 6;
     this.ensure(totalH + 10);
 
     this.page.drawRectangle({ x: ML, y: this.y - headH, width: CW, height: headH, color: NAVY });
     let hx = ML + 8;
     for (let i = 0; i < headers.length; i++) {
-      t(this.page, headers[i], hx, this.y - 14, this.bold, 7.5, BRANCO);
+      t(this.page, headers[i], hx, this.y - 15, this.bold, 9.0, BRANCO);
       hx += colWidths[i];
     }
     let ry = this.y - headH;
@@ -462,9 +462,9 @@ class DocRenderer {
       for (let ci = 0; ci < rows[ri].length; ci++) {
         let cell = san(rows[ri][ci]);
         const maxCW = colWidths[ci] - 10;
-        while (this.reg.widthOfTextAtSize(cell, 7.5) > maxCW && cell.length > 4)
+        while (this.reg.widthOfTextAtSize(cell, 9.0) > maxCW && cell.length > 4)
           cell = cell.slice(0, -4) + "...";
-        t(this.page, cell, cx, ry - 12, this.reg, 7.5);
+        t(this.page, cell, cx, ry - 13, this.reg, 9.0);
         cx += colWidths[ci];
       }
       ry -= rowH;
@@ -482,10 +482,10 @@ class DocRenderer {
     const barW = CW;
 
     // Label + valor acima da barra
-    t(this.page, label, ML, this.y, this.bold, 7.8, CINZA);
+    t(this.page, label, ML, this.y, this.bold, 9.0, CINZA);
     const vLabel = `${score.toFixed(1)} / ${maxScore}  (${Math.round(pct)}%)`;
-    const vLW = this.bold.widthOfTextAtSize(san(vLabel), 7.8);
-    t(this.page, vLabel, MR - vLW, this.y, this.bold, 7.8, cor);
+    const vLW = this.bold.widthOfTextAtSize(san(vLabel), 9.0);
+    t(this.page, vLabel, MR - vLW, this.y, this.bold, 9.0, cor);
     this.y -= LINE_H + 2;
 
     // Barra
