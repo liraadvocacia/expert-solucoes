@@ -33,9 +33,9 @@ export async function POST(
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Usa pdfjs-dist (ESM) via dynamic import — compatível com Next.js App Router
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfjsLib = await import("pdfjs-dist");
+    // Usa o build LEGACY do pdfjs-dist — necessário em Node.js porque o build
+    // principal requer DOMMatrix (API de browser) e falha silenciosamente no servidor.
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
     const doc = await loadingTask.promise;
 
