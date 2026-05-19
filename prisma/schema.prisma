@@ -50,6 +50,8 @@ model Pedido {
   cartaoCobrancaId  String?
   cartaoCheckoutUrl String?
 
+  prazoFinal    DateTime?  // prazo final do serviço
+
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id])
 
@@ -58,6 +60,7 @@ model Pedido {
   andamentos      Andamento[]
   parcelasBoleto  ParcelaBoleto[]
   relatorioRating RelatorioRating?
+  limpaNomeOrgaos LimpaNomeOrgaos?
 }
 
 model ItemPedido {
@@ -113,6 +116,18 @@ model ParcelaBoleto {
 
   pedidoId   String
   pedido     Pedido @relation(fields: [pedidoId], references: [id])
+}
+
+// pendente | em_andamento | baixado | sem_registro
+model LimpaNomeOrgaos {
+  id        String @id @default(cuid())
+  serasa    String @default("pendente")
+  spc       String @default("pendente")
+  boaVista  String @default("pendente")
+  protestos String @default("pendente")
+
+  pedidoId  String @unique
+  pedido    Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 }
 
 model RelatorioRating {

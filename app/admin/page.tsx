@@ -64,6 +64,15 @@ interface Contrato {
   assinaturaPath: string | null;
 }
 
+type OrgaoStatus = "pendente" | "em_andamento" | "baixado" | "sem_registro";
+
+interface LimpaNomeOrgaos {
+  serasa:    OrgaoStatus;
+  spc:       OrgaoStatus;
+  boaVista:  OrgaoStatus;
+  protestos: OrgaoStatus;
+}
+
 interface Pedido {
   id: string;
   codigo: string;
@@ -78,6 +87,7 @@ interface Pedido {
   pixCobrancaId: string | null;
   boletoCobrancaId: string | null;
   pixEmv: string | null;
+  prazoFinal: string | null;
   createdAt: string;
   cliente: { id: string; nome: string; cpf: string; telefone: string; email: string | null };
   itens: { id: string; nome: string; valor: number }[];
@@ -93,6 +103,7 @@ interface Pedido {
     fileName: string;
     createdAt: string;
   } | null;
+  limpaNomeOrgaos?: LimpaNomeOrgaos | null;
 }
 
 /* ─────────── Rating Types ─────────── */
@@ -226,6 +237,12 @@ export default function AdminPage() {
   const [ratingDados, setRatingDados]           = useState<Partial<RatingFormData> | null>(null);
   const [ratingErro, setRatingErro]             = useState<string | null>(null);
   const [ratingPendencias, setRatingPendencias] = useState<PendenciaForm[]>([]);
+
+  // ── Prazo final ──
+  const [salvandoPrazo, setSalvandoPrazo] = useState(false);
+
+  // ── Órgãos Limpa Nome ──
+  const [salvandoOrgao, setSalvandoOrgao] = useState<string | null>(null);
 
   // ── Andamentos ──
   const [novoAndTitulo, setNovoAndTitulo] = useState("");
@@ -430,6 +447,35 @@ export default function AdminPage() {
         ? { ...prev, andamentos: (prev.andamentos ?? []).filter((a) => a.id !== andamentoId) }
         : prev
     );
+  };
+
+  const salvarPrazoFinal = async (prazoFinal: string | null) => {
+    if (!pedidoSelecionado) return;
+    setSalvandoPrazo(true);
+    const res = await fetch(`/api/pedidos/${pedidoSelecionado.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prazoFinal: prazoFinal ? new Date(prazoFinal + "T12:00:00").toISOString() : null }),
+    });
+    if (res.ok) {
+      setPedidoSelecionado(ps => ps ? { ...ps, prazoFinal: prazoFinal ? new Date(prazoFinal + "T12:00:00").toISOString() : null } : ps);
+      setPedidos(list => list.map(p => p.id === pedidoSelecionado.id ? { ...p, prazoFinal: prazoFinal ? new Date(prazoFinal + "T12:00:00").toISOString() : null } : p));
+    }
+    setSalvandoPrazo(false);
+  };
+
+  const salvarOrgao = async (orgao: keyof LimpaNomeOrgaos, status: OrgaoStatus) => {
+    if (!pedidoSelecionado) return;
+    setSalvandoOrgao(orgao);
+    const atual = pedidoSelecionado.limpaNomeOrgaos ?? { serasa: "pendente", spc: "pendente", boaVista: "pendente", protestos: "pendente" };
+    const novoOrgaos = { ...atual, [orgao]: status };
+    await fetch(`/api/pedidos/${pedidoSelecionado.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limpaNomeOrgaos: novoOrgaos }),
+    });
+    setPedidoSelecionado(ps => ps ? { ...ps, limpaNomeOrgaos: novoOrgaos } : ps);
+    setSalvandoOrgao(null);
   };
 
   const cadastrarCliente = async (e: React.FormEvent) => {
@@ -1438,6 +1484,93 @@ export default function AdminPage() {
                   })}
                 </div>
               </section>
+
+              {/* ── PRAZO FINAL ── */}
+              {pedidoSelecionado.tipo === "servico" && (
+                <section>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Prazo Final do Serviço</h4>
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="date"
+                        defaultValue={pedidoSelecionado.prazoFinal ? new Date(pedidoSelecionado.prazoFinal).toISOString().split("T")[0] : ""}
+                        onBlur={e => salvarPrazoFinal(e.target.value || null)}
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-navy-600 bg-white"
+                      />
+                    </div>
+                    {salvandoPrazo && <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />}
+                    {pedidoSelecionado.prazoFinal && !salvandoPrazo && (
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${
+                        new Date(pedidoSelecionado.prazoFinal) < new Date()
+                          ? "bg-red-50 text-red-600"
+                          : new Date(pedidoSelecionado.prazoFinal).getTime() - Date.now() < 7 * 86400000
+                            ? "bg-amber-50 text-amber-600"
+                            : "bg-emerald-50 text-emerald-600"
+                      }`}>
+                        {new Date(pedidoSelecionado.prazoFinal) < new Date()
+                          ? "Vencido"
+                          : `${Math.ceil((new Date(pedidoSelecionado.prazoFinal).getTime() - Date.now()) / 86400000)} dias`}
+                      </span>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* ── ÓRGÃOS LIMPA NOME ── */}
+              {pedidoSelecionado.itens.some(i => i.nome.toLowerCase().includes("limpa nome")) && (() => {
+                const orgaos = pedidoSelecionado.limpaNomeOrgaos ?? { serasa: "pendente", spc: "pendente", boaVista: "pendente", protestos: "pendente" };
+                const cfgOrgao: Record<OrgaoStatus, { label: string; cor: string; bg: string }> = {
+                  pendente:     { label: "Pendente",     cor: "text-gray-500",    bg: "bg-gray-100"   },
+                  em_andamento: { label: "Em Andamento", cor: "text-blue-600",    bg: "bg-blue-50"    },
+                  baixado:      { label: "Baixado ✓",    cor: "text-emerald-700", bg: "bg-emerald-50" },
+                  sem_registro: { label: "Sem Registro", cor: "text-slate-500",   bg: "bg-slate-100"  },
+                };
+                const listaOrgaos: { key: keyof LimpaNomeOrgaos; label: string }[] = [
+                  { key: "serasa",    label: "SERASA"    },
+                  { key: "spc",       label: "SPC"       },
+                  { key: "boaVista",  label: "BOA VISTA" },
+                  { key: "protestos", label: "PROTESTOS" },
+                ];
+                return (
+                  <section>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Situação — Limpa Nome</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {listaOrgaos.map(({ key, label }) => {
+                        const status = orgaos[key] as OrgaoStatus;
+                        const cfg = cfgOrgao[status];
+                        return (
+                          <div key={key} className="bg-white border border-gray-200 rounded-xl p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-bold text-navy-800 tracking-wide">{label}</span>
+                              {salvandoOrgao === key && <RefreshCw className="w-3 h-3 text-blue-400 animate-spin" />}
+                            </div>
+                            <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${cfg.bg} ${cfg.cor}`}>
+                              {cfg.label}
+                            </div>
+                            <div className="flex flex-col gap-1 mt-1">
+                              {(["pendente", "em_andamento", "baixado", "sem_registro"] as OrgaoStatus[]).map(s => (
+                                <button
+                                  key={s}
+                                  disabled={salvandoOrgao === key}
+                                  onClick={() => salvarOrgao(key, s)}
+                                  className={`text-left text-xs px-2 py-1 rounded-lg transition-all ${
+                                    status === s
+                                      ? `${cfgOrgao[s].bg} ${cfgOrgao[s].cor} font-semibold ring-1 ring-current`
+                                      : "text-gray-400 hover:bg-gray-50"
+                                  } disabled:opacity-50`}
+                                >
+                                  {cfgOrgao[s].label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })()}
 
               {/* ── ANDAMENTO DE BAIXAS ── */}
               {pedidoSelecionado.tipo === "servico" && (

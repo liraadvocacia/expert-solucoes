@@ -11,12 +11,13 @@ export async function GET(
   const pedido = await prisma.pedido.findUnique({
     where: { id },
     include: {
-      cliente:        true,
-      itens:          true,
-      contrato:       true,
-      andamentos:     { orderBy: { createdAt: "asc" } },
-      parcelasBoleto: { orderBy: { numero: "asc" } },
+      cliente:         true,
+      itens:           true,
+      contrato:        true,
+      andamentos:      { orderBy: { createdAt: "asc" } },
+      parcelasBoleto:  { orderBy: { numero: "asc" } },
       relatorioRating: true,
+      limpaNomeOrgaos: true,
     },
   });
 
@@ -82,11 +83,27 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
+  // limpaNomeOrgaos é tratado como upsert separado
+  const { limpaNomeOrgaos, ...pedidoData } = body;
+
   const pedido = await prisma.pedido.update({
     where: { id },
-    data: body,
-    include: { cliente: true, itens: true, contrato: true },
+    data: pedidoData,
+    include: {
+      cliente:         true,
+      itens:           true,
+      contrato:        true,
+      limpaNomeOrgaos: true,
+    },
   });
+
+  if (limpaNomeOrgaos) {
+    await prisma.limpaNomeOrgaos.upsert({
+      where:  { pedidoId: id },
+      create: { pedidoId: id, ...limpaNomeOrgaos },
+      update: { ...limpaNomeOrgaos },
+    });
+  }
 
   return NextResponse.json(pedido);
 }
