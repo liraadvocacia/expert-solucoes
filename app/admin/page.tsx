@@ -200,6 +200,19 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+/* ─────────── Helpers ─────────── */
+
+function addDiasUteisClient(data: Date, dias: number): Date {
+  const d = new Date(data);
+  let adicionados = 0;
+  while (adicionados < dias) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) adicionados++;
+  }
+  return d;
+}
+
 /* ─────────── Main Component ─────────── */
 
 export default function AdminPage() {
@@ -298,8 +311,21 @@ export default function AdminPage() {
     setNovoAndDesc("");
     try {
       const res = await fetch(`/api/pedidos/${p.id}`);
-      const data = await res.json();
+      const data: Pedido = await res.json();
       setPedidoSelecionado(data);
+
+      // Auto-calcula prazo para Limpa Nome com contrato assinado mas sem prazoFinal
+      const ehLimpaNome = data.itens?.some(i => i.nome.toLowerCase().includes("limpa nome"));
+      const assinadoEm  = (data.contrato as (typeof data.contrato & { assinadoEm?: string }) | null)?.assinadoEm;
+      if (ehLimpaNome && !data.prazoFinal && assinadoEm) {
+        const prazo = addDiasUteisClient(new Date(assinadoEm), 45).toISOString();
+        await fetch(`/api/pedidos/${data.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prazoFinal: prazo }),
+        });
+        setPedidoSelecionado(d => d ? { ...d, prazoFinal: prazo } : d);
+      }
     } catch {
       // usa dados da lista se falhar
     } finally {
@@ -1535,35 +1561,33 @@ export default function AdminPage() {
                 return (
                   <section>
                     <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Situação — Limpa Nome</h4>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden bg-white">
                       {listaOrgaos.map(({ key, label }) => {
                         const status = orgaos[key] as OrgaoStatus;
-                        const cfg = cfgOrgao[status];
                         return (
-                          <div key={key} className="bg-white border border-gray-200 rounded-xl p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-bold text-navy-800 tracking-wide">{label}</span>
-                              {salvandoOrgao === key && <RefreshCw className="w-3 h-3 text-blue-400 animate-spin" />}
+                          <div key={key} className="flex items-center gap-3 px-3 py-2.5">
+                            <span className="text-xs font-bold text-navy-800 w-20 shrink-0">{label}</span>
+                            <div className="flex flex-wrap gap-1.5 flex-1">
+                              {(["pendente", "em_andamento", "baixado", "sem_registro"] as OrgaoStatus[]).map(s => {
+                                const c = cfgOrgao[s];
+                                const ativo = status === s;
+                                return (
+                                  <button
+                                    key={s}
+                                    disabled={salvandoOrgao === key}
+                                    onClick={() => salvarOrgao(key, s)}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all border ${
+                                      ativo
+                                        ? `${c.bg} ${c.cor} border-current`
+                                        : "bg-transparent border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600"
+                                    } disabled:opacity-50`}
+                                  >
+                                    {c.label}
+                                  </button>
+                                );
+                              })}
                             </div>
-                            <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${cfg.bg} ${cfg.cor}`}>
-                              {cfg.label}
-                            </div>
-                            <div className="flex flex-col gap-1 mt-1">
-                              {(["pendente", "em_andamento", "baixado", "sem_registro"] as OrgaoStatus[]).map(s => (
-                                <button
-                                  key={s}
-                                  disabled={salvandoOrgao === key}
-                                  onClick={() => salvarOrgao(key, s)}
-                                  className={`text-left text-xs px-2 py-1 rounded-lg transition-all ${
-                                    status === s
-                                      ? `${cfgOrgao[s].bg} ${cfgOrgao[s].cor} font-semibold ring-1 ring-current`
-                                      : "text-gray-400 hover:bg-gray-50"
-                                  } disabled:opacity-50`}
-                                >
-                                  {cfgOrgao[s].label}
-                                </button>
-                              ))}
-                            </div>
+                            {salvandoOrgao === key && <RefreshCw className="w-3 h-3 text-blue-400 animate-spin shrink-0" />}
                           </div>
                         );
                       })}
