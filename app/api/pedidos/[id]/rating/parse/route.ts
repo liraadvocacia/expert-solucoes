@@ -30,7 +30,6 @@ export async function POST(
   }
 
   let dados: ReturnType<typeof parseKsiText> = {};
-  let debugRawText = "";
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -57,10 +56,8 @@ export async function POST(
       rawText += pageText + "\n";
     }
 
-    debugRawText = rawText.slice(0, 3000); // primeiros 3000 chars para diagnóstico
     dados = parseKsiText(rawText);
 
-    // Debug: loga campos chave extraídos para facilitar diagnóstico
     console.log("[rating/parse] Extração concluída:", {
       nomeCliente:      dados.nomeCliente,
       cpf:              dados.cpf,
@@ -80,7 +77,6 @@ export async function POST(
   // Garante que nome/cpf do cliente sejam sempre incluídos como fallback
   return NextResponse.json({
     ok: true,
-    _debug: debugRawText, // REMOVER após diagnóstico
     dados: {
       nomeCliente:      dados.nomeCliente      ?? pedido.cliente.nome,
       cpf:              dados.cpf              ?? pedido.cliente.cpf,
