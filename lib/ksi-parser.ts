@@ -175,18 +175,22 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   }
 
   // Protestos:
-  // "01-CARTORIO DE PROTESTO DE\nTITULOS E DOCUMENTOS\n...\nR$:\n643.51"
-  // Captura nome do cartório (pode ter \n internos) + valor (pode estar na linha seguinte)
+  // Formato ratingv2:      "01-CARTORIO DE PROTESTO DE\nTITULOS..."
+  // Formato consultaNova:  "1 TABELIONATO DE PROTESTO DE TITULOS - SERRO"
   const protestoDetailRe =
-    /\b(\d{2,3}-[A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][A-Za-záéíóúàâêôãõüçÁÉÍÓÚÀÂÊÔÃÕÜÇ\w\s\n.,'()-]{5,200}?)\s*R\$[:\s\n]*([\d.,]+)/gi;
+    /\b(\d{1,3}[\s\-][A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ][A-Za-záéíóúàâêôãõüçÁÉÍÓÚÀÂÊÔÃÕÜÇ\w\s\n\-,'().]{5,200}?)\s*R\$[:\s\n]*([\d.,]+)/gi;
   while ((m = protestoDetailRe.exec(text)) !== null) {
-    let credor = limparCredor(m[1])
-      .replace(/^\d{2,3}-\s*/, "")                          // remove "01-"
-      .replace(/\s+N[aã]o\s+divulgado.*/i, "")              // remove data + endereço
+    let credor = m[1]
+      .replace(/\n/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .replace(/^\d{1,3}[\s\-]\s*/, "")                     // remove "01-" ou "1 "
+      .replace(/\s+N[aã]o\s+divulgado.*/i, "")              // remove "Nao divulgado ..."
       .replace(/\s+\d{2}\/\d{2}\/\d{4}.*/i, "")            // remove data formatada
-      .replace(/\s+(?:AVENIDA|PRACA|PRAÇA|RUA|AV\.|R\.)\s+.*/i, "") // remove endereço
+      .replace(/\s+(?:AVENIDA|PRACA|PRAÇA|RUA|AV\.?|R\.)\s+.*/i, "") // remove endereço
+      .replace(/\s*-\s*$/, "")                              // remove traço final
       .trim();
-    const valor  = parseBRL(m[2]);
+    const valor = parseBRL(m[2]);
     if (valor > 0 && credor.length > 3) {
       pendencias.push({ tipo: "Protesto", credor, valor });
     }
