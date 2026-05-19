@@ -490,9 +490,40 @@ export default function AdminPage() {
   const uploadPdfRating = async (file: File) => {
     setRatingFase("uploading");
     setRatingErro(null);
-    const fd = new FormData();
-    fd.append("pdf", file);
-    const res  = await fetch(`/api/pedidos/${pedidoSelecionado!.id}/rating/parse`, { method: "POST", body: fd });
+
+    // Extrai texto do PDF no BROWSER (pdfjs-dist funciona nativamente aqui —
+    // no servidor falha por ausência de DOMMatrix e outras APIs de browser)
+    let rawText = "";
+    try {
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        let pageText = "";
+        for (const item of content.items) {
+          if (!("str" in item)) continue;
+          const itm = item as { str: string; hasEOL?: boolean };
+          pageText += itm.str + (itm.hasEOL ? "\n" : " ");
+        }
+        rawText += pageText + "\n";
+      }
+    } catch (err) {
+      console.error("[uploadPdfRating] Erro ao ler PDF:", err);
+      setRatingErro("Não foi possível ler o PDF. Verifique se é um arquivo válido.");
+      setRatingFase("idle");
+      return;
+    }
+
+    // Envia o TEXTO (não o arquivo) ao servidor — só regex, sem biblioteca PDF
+    const res = await fetch(`/api/pedidos/${pedidoSelecionado!.id}/rating/parse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: rawText }),
+    });
     const json = await res.json();
     if (!res.ok) {
       setRatingErro(json.error || "Erro ao processar PDF");
