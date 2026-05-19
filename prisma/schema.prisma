@@ -142,6 +142,11 @@ model RelatorioRating {
   pontualidade     Float?
   pontualidadeMax  Float?
   pendenciasJson   String   // JSON serializado de PendenciaRating[]
+  score            Float?
+  scoreMax         Float?
+  conclusao        String?
+  dataNascimento   String?
+  dataConsulta     DateTime?
   filePath         String
   fileName         String
   hash             String
