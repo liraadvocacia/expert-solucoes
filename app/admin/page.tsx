@@ -1336,20 +1336,34 @@ export default function AdminPage() {
                       {(ratingFase === "idle" || ratingFase === "pronto") && (
                         <div className="space-y-3">
                           {pedidoSelecionado.relatorioRating && (
-                            <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-emerald-600" />
-                                <span className="text-sm text-emerald-800 font-medium">
-                                  {pedidoSelecionado.relatorioRating.fileName}
-                                </span>
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-emerald-600" />
+                                  <span className="text-sm text-emerald-800 font-medium">
+                                    {pedidoSelecionado.relatorioRating.fileName}
+                                  </span>
+                                </div>
+                                <a
+                                  href={`/api/relatorios/${pedidoSelecionado.relatorioRating.id}/download`}
+                                  target="_blank"
+                                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                                >
+                                  <Download className="w-3 h-3" /> Baixar PDF
+                                </a>
                               </div>
-                              <a
-                                href={`/api/relatorios/${pedidoSelecionado.relatorioRating.id}/download`}
-                                target="_blank"
-                                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg flex items-center gap-1 transition-colors"
-                              >
-                                <Download className="w-3 h-3" /> Baixar PDF
-                              </a>
+                              <WhatsAppButton
+                                telefone={pedidoSelecionado.cliente.telefone}
+                                label="Enviar ao cliente via WhatsApp"
+                                mensagem={
+                                  `Olá, ${pedidoSelecionado.cliente.nome.split(" ")[0]}! 👋\n\n` +
+                                  `Aqui é da *Expert Soluções Financeiras*.\n\n` +
+                                  `Seu *Relatório de Rating Bancário* foi gerado e está disponível para retirada.\n\n` +
+                                  `📋 *Pedido:* ${pedidoSelecionado.codigo}\n` +
+                                  `📅 *Data:* ${new Date(pedidoSelecionado.relatorioRating.createdAt).toLocaleDateString("pt-BR")}\n\n` +
+                                  `Entre em contato conosco para receber o documento ou tire suas dúvidas. Estamos à disposição!`
+                                }
+                              />
                             </div>
                           )}
                           <div>
