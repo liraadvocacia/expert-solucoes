@@ -24,9 +24,9 @@ export async function POST(
   }
 
   // Validações básicas
-  if (!body.nomeCliente || !body.cpf || !body.classificacao) {
+  if (!body.nomeCliente || !body.cpf) {
     return NextResponse.json(
-      { error: "Campos obrigatórios ausentes: nomeCliente, cpf, classificacao" },
+      { error: "Campos obrigatórios ausentes: nomeCliente, cpf" },
       { status: 400 }
     );
   }
@@ -34,7 +34,7 @@ export async function POST(
   const dados: DadosRating = {
     nomeCliente:      String(body.nomeCliente),
     cpf:              String(body.cpf),
-    classificacao:    String(body.classificacao),
+    classificacao:    String(body.classificacao ?? ""),
     descricaoClasse:  String(body.descricaoClasse ?? ""),
     rendaPresumida:   Number(body.rendaPresumida  ?? 0),
     comprometimento:  Number(body.comprometimento ?? 0),
@@ -52,6 +52,10 @@ export async function POST(
       : [],
     codigoPedido:     pedido.codigo,
     nomeServico:      pedido.itens.map(i => i.nome).join(", "),
+    score:            body.score != null ? Number(body.score) : undefined,
+    scoreMax:         body.scoreMax != null ? Number(body.scoreMax) : undefined,
+    conclusao:        body.conclusao ? String(body.conclusao) : undefined,
+    dataNascimento:   body.dataNascimento ? String(body.dataNascimento) : undefined,
   };
 
   // Gera o PDF

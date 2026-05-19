@@ -20,6 +20,13 @@
 
 import type { DadosRating, PendenciaRating } from "./rating-pdf";
 
+type DadosRatingExtendido = Partial<DadosRating> & {
+  score?: number;
+  scoreMax?: number;
+  conclusao?: string;
+  dataNascimento?: string;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -65,7 +72,7 @@ function limparCredor(str: string): string {
 
 // ─── Main parser ──────────────────────────────────────────────────────────────
 
-export function parseKsiText(rawText: string): Partial<DadosRating> {
+export function parseKsiText(rawText: string): DadosRatingExtendido {
   // Normaliza: colapsa espaços/tabs, preserva quebras de linha reais do PDF
   const text = normalizar(rawText);
 
@@ -157,6 +164,32 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
   const pontM = text.match(/Pontualidade\s+de\s+Pagamento\s*[:\s]*([\d.,]+)\s*%?/i);
   if (pontM) pontualidade = parseFloat(pontM[1].replace(",", ".")) || undefined;
 
+  // ── Score Positivo (formato consultaNovaResponsePF) ─────────────────────
+  // "Score Positivo :   408"
+  let score: number | undefined;
+  let scoreMax: number | undefined;
+  const scoreM = text.match(/Score\s+Positivo\s*[:\s]+([\d]+)/i);
+  if (scoreM) { score = parseInt(scoreM[1], 10); scoreMax = 1000; }
+
+  // ── Data de nascimento ───────────────────────────────────────────────────
+  // "Data de Nascimento :   16/03/1980 - Domingo"
+  let dataNascimento: string | undefined;
+  const nascM = text.match(/Data\s+de\s+Nascimento\s*[:\s]+([\d]{2}[\/\-][\d]{2}[\/\-][\d]{4})/i);
+  if (nascM) dataNascimento = nascM[1].replace(/-/g, "/");
+
+  // ── Conclusão / Aprovação ────────────────────────────────────────────────
+  // ratingv2: "Conclusão de Análise Inteligente:   Reprovado"
+  // consultaNova: texto livre com "não é aprovado" / "crédito não é aprovado"
+  let conclusao: string | undefined;
+  const concM = text.match(/Conclus[aã]o\s+de\s+An[aá]lise\s+Inteligente[:\s]+(\S[^\n]{0,40})/i);
+  if (concM) {
+    conclusao = concM[1].trim();
+  } else if (/n[aã]o\s+[eé]\s+aprovado|cr[eé]dito\s+n[aã]o\s+[eé]\s+aprovado/i.test(text)) {
+    conclusao = "Reprovado";
+  } else if (/cr[eé]dito\s+[eé]\s+aprovado|[eé]\s+aprovado/i.test(text)) {
+    conclusao = "Aprovado";
+  }
+
   // ── Pendências ─────────────────────────────────────────────────────────────
   const pendencias: PendenciaRating[] = [];
 
@@ -232,5 +265,9 @@ export function parseKsiText(rawText: string): Partial<DadosRating> {
     pontualidadeMax: 100,
     pendencias: pendenciasUnicas,
     dataConsulta,
+    score,
+    scoreMax,
+    dataNascimento,
+    conclusao,
   };
 }

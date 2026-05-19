@@ -567,7 +567,7 @@ export interface DadosRating {
   nomeCliente:     string;
   cpf:             string;
   dataConsulta:    Date;
-  classificacao:   string;
+  classificacao:   string;   // "A+".."C-" ou "" quando formato sem grade
   descricaoClasse: string;
   rendaPresumida:  number;
   comprometimento: number;   // 0–100 (%)
@@ -578,6 +578,11 @@ export interface DadosRating {
   observacoes?:    string;
   codigoPedido?:   string;
   nomeServico?:    string;
+  // campos extras extraídos de formatos sem grade A/B/C
+  score?:          number;   // Score Positivo (0–1000)
+  scoreMax?:       number;
+  conclusao?:      string;   // "Reprovado" / "Aprovado"
+  dataNascimento?: string;   // "DD/MM/YYYY"
 }
 
 // ─── Classificadores de tipo de pendência ────────────────────────────────────
@@ -623,26 +628,58 @@ export async function gerarRelatorioRatingPDF(dados: DadosRating): Promise<{
   r.goldLine();
   r.gap(4);
 
+  const temClassificacao = Boolean(dados.classificacao);
+  const totalPend = dados.pendencias.reduce((s, p) => s + p.valor, 0);
+  const conclusaoFinal = dados.conclusao ??
+    (temClassificacao ? (dados.classificacao.startsWith("C") ? "Reprovado" : "Aprovado") : undefined);
+  const reprovado = conclusaoFinal?.toLowerCase().includes("reprov") ||
+    (temClassificacao && dados.classificacao.startsWith("C")) ||
+    totalPend > 0;
+
   // ──────────────────────────────────────────────────────────────────────────
   // DADOS DO ANALISADO
   // ──────────────────────────────────────────────────────────────────────────
   r.secHeader("DADOS DO ANALISADO");
-  r.dadosAnalisadoBox([
+  const linhasDadosAnalisado: [string, string][] = [
     ["Nome Completo", dados.nomeCliente],
     ["CPF",           dados.cpf],
-    ["Data Consulta KSI", fmtData(dados.dataConsulta)],
-  ]);
+  ];
+  if (dados.dataNascimento) linhasDadosAnalisado.push(["Data de Nascimento", dados.dataNascimento]);
+  linhasDadosAnalisado.push(["Data Consulta KSI", fmtData(dados.dataConsulta)]);
+  r.dadosAnalisadoBox(linhasDadosAnalisado);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // RESULTADO DA ANÁLISE — ESCALA VISUAL
+  // RESULTADO DA ANÁLISE — ESCALA VISUAL ou SCORE
   // ──────────────────────────────────────────────────────────────────────────
   r.secHeader("RESULTADO DA ANÁLISE");
   r.gap(6);
-  r.escalaRating(dados.classificacao, dados.descricaoClasse);
 
-  const totalPend = dados.pendencias.reduce((s, p) => s + p.valor, 0);
+  if (temClassificacao) {
+    // Formato ratingv2: escala A/B/C visual
+    r.escalaRating(dados.classificacao, dados.descricaoClasse);
+  } else {
+    // Formato consultaNovaResponsePF: banner de aprovação + score
+    const corRes  = reprovado ? VERMELHO : VERDE;
+    const bgRes   = reprovado ? rgb(1, 0.94, 0.94) : rgb(0.92, 1, 0.93);
+    const textoRes = conclusaoFinal ?? (reprovado ? "Reprovado" : "Aprovado");
+    r.ensure(52);
+    r.page.drawRectangle({ x: ML, y: r.y - 44, width: CW, height: 44, color: bgRes,
+      borderColor: corRes, borderWidth: 1.2 });
+    r.page.drawRectangle({ x: ML, y: r.y - 44, width: 5, height: 44, color: corRes });
+    const resLabel = "RESULTADO:";
+    const resLW = bold.widthOfTextAtSize(san(resLabel), 8);
+    t(r.page, resLabel, ML + 14, r.y - 16, bold, 8, corRes);
+    const resVal = textoRes.toUpperCase();
+    const resVW  = bold.widthOfTextAtSize(san(resVal), 16);
+    t(r.page, resVal, ML + 14 + resLW + 8, r.y - 20, bold, 16, corRes);
+    const scoreTxt = dados.score !== undefined
+      ? `Score Positivo: ${dados.score} / ${dados.scoreMax ?? 1000}`
+      : "";
+    if (scoreTxt) t(r.page, scoreTxt, ML + 14, r.y - 36, reg, 8.5, CINZA);
+    r.y -= 58;
+  }
 
-  if (dados.classificacao.startsWith("C") || dados.classificacao.startsWith("D")) {
+  if (reprovado) {
     if (totalPend > 0) {
       r.alertBox(
         `Foram identificadas restrições financeiras totalizando ` +
@@ -675,26 +712,46 @@ export async function gerarRelatorioRatingPDF(dados: DadosRating): Promise<{
   ]);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SCORE DE PONTUALIDADE
+  // SCORE E PONTUALIDADE
   // ──────────────────────────────────────────────────────────────────────────
-  if (dados.pontualidade !== undefined) {
+  if (dados.pontualidade !== undefined || dados.score !== undefined) {
     r.addPage();
-    r.secHeader("SCORE DE PONTUALIDADE DE PAGAMENTO");
+    r.secHeader("INDICADORES DE CRÉDITO");
     r.gap(6);
-    r.scoreBar("Índice de Pontualidade",
-      dados.pontualidade, dados.pontualidadeMax ?? 100);
-    r.gap(2);
-    const pct = (dados.pontualidade / (dados.pontualidadeMax ?? 100)) * 100;
-    if (pct >= 70)
-      r.paragrafo("Histórico de pagamentos satisfatório. Mantenha a regularidade para fortalecer o rating.");
-    else if (pct >= 40)
-      r.paragrafo("Histórico de pagamentos moderado. Há registros de atrasos que afetam negativamente a pontuação.");
-    else
-      r.paragrafo(
-        "Histórico de pagamentos crítico. Há muitos registros de inadimplência ou atraso. " +
-        "A regularização das pendências e o cumprimento em dia das obrigações correntes são " +
-        "essenciais para a recuperação do score."
-      );
+
+    if (dados.score !== undefined) {
+      r.scoreBar("Score Positivo (BACEN / Mercado Financeiro)",
+        dados.score, dados.scoreMax ?? 1000);
+      r.gap(2);
+      const pctScore = (dados.score / (dados.scoreMax ?? 1000)) * 100;
+      if (pctScore >= 70)
+        r.paragrafo("Score positivo elevado. Boa capacidade de crédito no mercado financeiro.");
+      else if (pctScore >= 40)
+        r.paragrafo("Score positivo moderado. Indica risco médio na concessão de crédito.");
+      else
+        r.paragrafo(
+          "Score positivo baixo. Indica alto risco de inadimplência. " +
+          "A regularização das pendências é o passo fundamental para a recuperação do score."
+        );
+      r.gap(6);
+    }
+
+    if (dados.pontualidade !== undefined) {
+      r.scoreBar("Índice de Pontualidade de Pagamento",
+        dados.pontualidade, dados.pontualidadeMax ?? 100);
+      r.gap(2);
+      const pct = (dados.pontualidade / (dados.pontualidadeMax ?? 100)) * 100;
+      if (pct >= 70)
+        r.paragrafo("Histórico de pagamentos satisfatório. Mantenha a regularidade para fortalecer o rating.");
+      else if (pct >= 40)
+        r.paragrafo("Histórico de pagamentos moderado. Há registros de atrasos que afetam negativamente a pontuação.");
+      else
+        r.paragrafo(
+          "Histórico de pagamentos crítico. Há muitos registros de inadimplência ou atraso. " +
+          "A regularização das pendências e o cumprimento em dia das obrigações correntes são " +
+          "essenciais para a recuperação do score."
+        );
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -724,16 +781,30 @@ export async function gerarRelatorioRatingPDF(dados: DadosRating): Promise<{
   // ──────────────────────────────────────────────────────────────────────────
   r.secHeader("PARECER TÉCNICO - EXPERT SOLUÇÕES FINANCEIRAS");
 
-  r.paragrafoBold(
-    `Análise: ${dados.nomeCliente} - Rating ${dados.classificacao} (${dados.descricaoClasse})`
-  );
+  const labelRating = temClassificacao
+    ? `Rating ${dados.classificacao} (${dados.descricaoClasse})`
+    : dados.score !== undefined
+      ? `Score ${dados.score} — ${conclusaoFinal ?? "Sem classificação"}`
+      : conclusaoFinal ?? "Sem classificação";
+
+  r.paragrafoBold(`Análise: ${dados.nomeCliente} - ${labelRating}`);
   r.gap(4);
 
-  r.paragrafo(
-    `Com base nas informações obtidas junto aos órgãos de crédito consultados, o analisado ` +
-    `apresenta classificação ${dados.classificacao} (${dados.descricaoClasse}), ` +
-    `não atendendo aos critérios mínimos exigidos para aprovação no serviço de Rating Bancário.`
-  );
+  if (temClassificacao) {
+    r.paragrafo(
+      `Com base nas informações obtidas junto aos órgãos de crédito consultados, o analisado ` +
+      `apresenta classificação ${dados.classificacao} (${dados.descricaoClasse}), ` +
+      `não atendendo aos critérios mínimos exigidos para aprovação no serviço de Rating Bancário.`
+    );
+  } else {
+    r.paragrafo(
+      `Com base nas informações obtidas junto aos órgãos de crédito consultados, o analisado ` +
+      `${reprovado ? "não atende" : "atende"} aos critérios exigidos para aprovação no serviço de Rating Bancário.` +
+      (dados.score !== undefined
+        ? ` Score Positivo apurado: ${dados.score} de ${dados.scoreMax ?? 1000} pontos.`
+        : "")
+    );
+  }
 
   if (totalPend > 0) {
     const n = dados.pendencias.length;
