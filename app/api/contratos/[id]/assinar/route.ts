@@ -4,6 +4,17 @@ import { aplicarAssinaturaPDF, gerarContratoPDF, type DadosContrato } from "@/li
 import { enviarEmailContratoAssinado } from "@/lib/email";
 import fs from "fs";
 
+function addDiasUteis(data: Date, dias: number): Date {
+  const d = new Date(data);
+  let adicionados = 0;
+  while (adicionados < dias) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) adicionados++; // pula sábado (6) e domingo (0)
+  }
+  return d;
+}
+
 /**
  * POST /api/contratos/[id]/assinar
  *
@@ -131,12 +142,16 @@ export async function POST(
     });
 
     // Atualiza status do pedido para "em_andamento" se estava aguardando
-    if (contrato.pedido.status === "aguardando_pagamento") {
-      await prisma.pedido.update({
-        where: { id: contrato.pedidoId },
-        data: { status: "em_andamento" },
-      });
-    }
+    const isLimpaNome = contrato.pedido.itens.some(i =>
+      i.nome.toLowerCase().includes("limpa nome")
+    );
+    await prisma.pedido.update({
+      where: { id: contrato.pedidoId },
+      data: {
+        ...(contrato.pedido.status === "aguardando_pagamento" ? { status: "em_andamento" } : {}),
+        ...(isLimpaNome ? { prazoFinal: addDiasUteis(assinadoEm, 45) } : {}),
+      },
+    });
 
     // ── Auto-gera parcelas de boleto (30 e 60 dias) se modalidade for boleto_parcelado ──
     if (contrato.pedido.modalidade === "boleto_parcelado") {
