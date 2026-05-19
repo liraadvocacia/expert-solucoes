@@ -160,16 +160,20 @@ function podVerificarCora(forma: string | null): boolean {
 
 /* ─────────── Small Components ─────────── */
 
-function whatsappLink(telefone: string, mensagem: string): string {
+function whatsappLink(telefone: string | null | undefined, mensagem: string): string | null {
+  if (!telefone) return null;
   const digits = telefone.replace(/\D/g, "");
+  if (!digits) return null;
   const numero = digits.startsWith("55") ? digits : `55${digits}`;
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
 }
 
-function WhatsAppButton({ telefone, mensagem, label }: { telefone: string; mensagem: string; label: string }) {
+function WhatsAppButton({ telefone, mensagem, label }: { telefone: string | null | undefined; mensagem: string; label: string }) {
+  const href = whatsappLink(telefone, mensagem);
+  if (!href) return <span className="text-xs text-gray-400 italic">Sem telefone</span>;
   return (
     <a
-      href={whatsappLink(telefone, mensagem)}
+      href={href}
       target="_blank"
       rel="noreferrer"
       className="inline-flex items-center gap-1 text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg transition-colors font-medium"
@@ -822,16 +826,18 @@ export default function AdminPage() {
                             <div className="text-xs text-gray-500">{p.cliente.cpf}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-xs text-gray-400">{p.cliente.telefone}</span>
-                              <a
-                                href={whatsappLink(p.cliente.telefone, `Olá, ${p.cliente.nome.split(" ")[0]}! 👋`)}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={e => e.stopPropagation()}
-                                title="Abrir WhatsApp"
-                                className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shrink-0"
-                              >
-                                <MessageCircle className="w-3 h-3" />
-                              </a>
+                              {whatsappLink(p.cliente.telefone, `Olá, ${p.cliente.nome.split(" ")[0]}! 👋`) && (
+                                <a
+                                  href={whatsappLink(p.cliente.telefone, `Olá, ${p.cliente.nome.split(" ")[0]}! 👋`)!}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  title="Abrir WhatsApp"
+                                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shrink-0"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                </a>
+                              )}
                             </div>
                           </td>
                           <td className="px-5 py-3.5">
