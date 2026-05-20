@@ -566,85 +566,28 @@ export default function AdminPage() {
   const uploadPdfRating = async (file: File) => {
     setRatingFase("uploading");
     setRatingErro(null);
-
-    // 1. Extrai texto do PDF no browser
-    let rawText = "";
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        let pageText = "";
-        for (const item of content.items) {
-          if (!("str" in item)) continue;
-          const itm = item as { str: string; hasEOL?: boolean };
-          pageText += itm.str + (itm.hasEOL ? "\n" : " ");
-        }
-        rawText += pageText + "\n";
+      const fd = new FormData();
+      fd.append("pdf", file);
+      const res  = await fetch(`/api/pedidos/${pedidoSelecionado!.id}/rating/rebrand`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setRatingErro(json.error || "Erro ao processar PDF");
+        setRatingFase("idle");
+        return;
       }
-    } catch (err) {
-      console.error("[uploadPdfRating] Erro ao ler PDF:", err);
-      setRatingErro("Não foi possível ler o PDF. Verifique se é um arquivo válido.");
+      setPedidos(ps => ps.map(p => p.id === pedidoSelecionado!.id
+        ? { ...p, relatorioRating: json.relatorio } : p));
+      setPedidoSelecionado(ps => ps ? { ...ps, relatorioRating: json.relatorio } : ps);
+      setRatingFase("pronto");
+    } catch {
+      setRatingErro("Erro de conexão. Tente novamente.");
       setRatingFase("idle");
-      return;
     }
-
-    // 2. Extrai dados via regex no servidor
-    const parseRes = await fetch(`/api/pedidos/${pedidoSelecionado!.id}/rating/parse`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: rawText }),
-    });
-    const parseJson = await parseRes.json();
-    if (!parseRes.ok) {
-      setRatingErro(parseJson.error || "Erro ao processar PDF");
-      setRatingFase("idle");
-      return;
-    }
-
-    const d = parseJson.dados;
-    setRatingFase("gerando");
-
-    // 3. Gera o relatório automaticamente com os dados extraídos
-    const gerarRes = await fetch(`/api/pedidos/${pedidoSelecionado!.id}/rating/gerar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nomeCliente:      d.nomeCliente      || pedidoSelecionado!.cliente.nome,
-        cpf:              d.cpf              || pedidoSelecionado!.cliente.cpf,
-        classificacao:    d.classificacao    ?? "",
-        descricaoClasse:  d.descricaoClasse  ?? "",
-        rendaPresumida:   d.rendaPresumida   ?? 0,
-        comprometimento:  d.comprometimento  ?? 0,
-        capacidadeMensal: d.capacidadeMensal ?? 0,
-        pontualidade:     d.pontualidade,
-        pontualidadeMax:  d.pontualidadeMax  ?? 100,
-        dataConsulta:     d.dataConsulta ?? new Date().toISOString(),
-        pendencias:       d.pendencias ?? [],
-        score:            d.score,
-        scoreMax:         d.scoreMax,
-        conclusao:        d.conclusao,
-        dataNascimento:   d.dataNascimento,
-      }),
-    });
-    const gerarJson = await gerarRes.json();
-    if (!gerarRes.ok) {
-      setRatingErro(gerarJson.error || "Erro ao gerar relatório");
-      setRatingFase("idle");
-      return;
-    }
-
-    setPedidos(ps => ps.map(p => p.id === pedidoSelecionado!.id
-      ? { ...p, relatorioRating: gerarJson.relatorio } : p));
-    setPedidoSelecionado(ps => ps ? { ...ps, relatorioRating: gerarJson.relatorio } : ps);
-    setRatingFase("pronto");
   };
-
-  const gerarRelatorio = async () => { /* mantido para compatibilidade */ };
 
   /* ── Derived ── */
 
@@ -1475,13 +1418,11 @@ export default function AdminPage() {
                       )}
 
                       {/* PROCESSANDO */}
-                      {(ratingFase === "uploading" || ratingFase === "gerando") && (
+                      {ratingFase === "uploading" && (
                         <div className="flex flex-col items-center gap-2 py-6">
                           <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
-                          <span className="text-sm font-medium text-slate-700">
-                            {ratingFase === "uploading" ? "Lendo e extraindo dados do PDF..." : "Gerando relatório Expert..."}
-                          </span>
-                          <span className="text-xs text-slate-400">Aguarde, isso leva alguns segundos</span>
+                          <span className="text-sm font-medium text-slate-700">Processando PDF...</span>
+                          <span className="text-xs text-slate-400">Aplicando identidade visual Expert</span>
                         </div>
                       )}
 

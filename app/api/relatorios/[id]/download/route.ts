@@ -19,8 +19,15 @@ export async function GET(
 
   let filePath = relatorio.filePath;
 
-  // Vercel/serverless: /tmp é efêmero — regenera se o arquivo sumiu
+  // Vercel/serverless: /tmp é efêmero — tenta regenerar se o arquivo sumiu
   if (!fs.existsSync(filePath)) {
+    // PDFs rebranded (classificacao vazia) não podem ser regenerados sem o original KSI
+    if (!relatorio.classificacao) {
+      return NextResponse.json(
+        { error: "O arquivo expirou do servidor. Faça upload do PDF da KSI novamente para gerar um novo relatório." },
+        { status: 410 }
+      );
+    }
     try {
       const pendencias = JSON.parse(relatorio.pendenciasJson ?? "[]");
       const resultado = await gerarRelatorioRatingPDF({
